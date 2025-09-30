@@ -112,19 +112,31 @@ fig.add_trace(go.Bar(name='Kosten', x=df_monthly['Monat'], y=df_monthly['Kosten'
                      marker_color='#ef4444', text=df_monthly['Kosten'].apply(lambda x: f'€{x/1000:.0f}k'),
                      textposition='outside'), row=1, col=1)
 
-# Chart 2: DB in Euro
+# Chart 2: DB in Euro - mit dynamischer Y-Achse
 colors_db = ['#22c55e' if x >= 0 else '#ef4444' for x in df_monthly['DB']]
 fig.add_trace(go.Bar(name='DB (€)', x=df_monthly['Monat'], y=df_monthly['DB'], 
                      marker_color=colors_db, showlegend=False,
                      text=df_monthly['DB'].apply(lambda x: f'€{x/1000:.0f}k'),
                      textposition='outside'), row=1, col=2)
 
-# Chart 3: Marge in %
+# Dynamische Y-Achse für DB - berücksichtigt negative Werte
+min_db = df_monthly['DB'].min()
+max_db = df_monthly['DB'].max()
+y_range_db = [min_db * 1.2 if min_db < 0 else 0, max_db * 1.15]
+fig.update_yaxes(range=y_range_db, row=1, col=2)
+
+# Chart 3: Marge in % - mit dynamischer Y-Achse
 colors_marge = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in df_monthly['Marge %']]
 fig.add_trace(go.Bar(name='Marge %', x=df_monthly['Monat'], y=df_monthly['Marge %'], 
                      marker_color=colors_marge, showlegend=False,
                      text=df_monthly['Marge %'].apply(lambda x: f'{x:.1f}%'),
                      textposition='outside'), row=2, col=1)
+
+# Dynamische Y-Achse für Marge - berücksichtigt negative Werte
+min_marge = df_monthly['Marge %'].min()
+max_marge = df_monthly['Marge %'].max()
+y_range_marge = [min_marge * 1.2 if min_marge < 0 else 0, max_marge * 1.15]
+fig.update_yaxes(range=y_range_marge, row=2, col=1)
 
 # Chart 4: Kumulative Entwicklung
 df_monthly['Kum_Umsaetze'] = df_monthly['Umsaetze'].cumsum()
