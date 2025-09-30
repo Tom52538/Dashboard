@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
+import os
 
 st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
 
@@ -11,13 +12,35 @@ st.title("🚜 AGRO F66 Maschinen Dashboard")
 
 # Load data
 @st.cache_data
-def load_data():
-    df = pd.read_excel('Dashboard_Master.xlsx')
+def load_data(file):
+    if isinstance(file, str):
+        df = pd.read_excel(file)
+    else:
+        df = pd.read_excel(file)
     return df
 
-try:
-    df = load_data()
+# Check if file exists in repo, otherwise show upload
+data_file = 'Dashboard_Master.xlsx'
+df = None
+
+if os.path.exists(data_file):
+    try:
+        df = load_data(data_file)
+    except Exception as e:
+        st.error(f"Fehler beim Laden der Datei: {str(e)}")
+else:
+    st.warning("⚠️ Dashboard_Master.xlsx nicht gefunden. Bitte lade die Datei hoch:")
+    uploaded_file = st.file_uploader("Excel-Datei hochladen", type=['xlsx'])
     
+    if uploaded_file is not None:
+        try:
+            df = load_data(uploaded_file)
+            st.success("✅ Datei erfolgreich geladen!")
+        except Exception as e:
+            st.error(f"❌ Fehler beim Laden: {str(e)}")
+
+# Nur fortfahren wenn Daten geladen sind
+if df is not None:
     # Verfügbare Monate extrahieren (aus Spaltennamen)
     cost_cols = [col for col in df.columns if col.startswith('Kosten ')]
     revenue_cols = [col for col in df.columns if col.startswith('Umsätze ')]
@@ -231,7 +254,5 @@ try:
             file_name=f'maschinen_export_{selected_month}.csv',
             mime='text/csv'
         )
-
-except Exception as e:
-    st.error(f"❌ Fehler beim Laden der Daten: {str(e)}")
-    st.write("Bitte stelle sicher, dass die Datei 'Dashboard_Master.xlsx' im richtigen Verzeichnis liegt.")
+else:
+    st.info("👆 Bitte lade die Dashboard_Master.xlsx Datei hoch oder stelle sicher, dass sie im Repository liegt.")
