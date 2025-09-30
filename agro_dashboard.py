@@ -168,31 +168,63 @@ if nl_top != 'Gesamt' and has_nl:
 
 # Immer nach Marge % sortieren
 top_10 = df_top.nlargest(10, 'Marge YTD %')
-top_10_display = top_10[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']]
+top_10_display = top_10[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
+
+st.markdown("#### Tabelle & Chart")
 
 col1, col2 = st.columns([1, 1])
 with col1:
-    st.markdown("#### Tabelle")
     top_display = top_10_display.copy()
     top_display['Kosten YTD'] = top_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Umsätze YTD'] = top_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Marge YTD %'] = top_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
-    st.dataframe(top_display, use_container_width=True, hide_index=True)
+    st.dataframe(top_display, use_container_width=True, hide_index=True, height=400)
 
 with col2:
-    st.markdown("#### Chart")
-    colors_marge = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in top_10_display['Marge YTD %']]
-    fig_top = go.Figure(go.Bar(
-        x=top_10_display['Marge YTD %'],
+    # Gestapelter Balken: Kosten + DB = Umsatz
+    fig_top = go.Figure()
+    
+    fig_top.add_trace(go.Bar(
+        name='Kosten',
         y=top_10_display['Code'].astype(str),
+        x=top_10_display['Kosten YTD'],
         orientation='h',
-        marker_color=colors_marge,
-        text=top_10_display['Marge YTD %'].apply(lambda x: f'{x:.1f}%'),
-        textposition='outside',
-        showlegend=False
+        marker_color='#ef4444',
+        text=top_10_display['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+        textposition='inside'
     ))
-    fig_top.update_layout(height=400, xaxis_title='Marge (%)', yaxis=dict(autorange='reversed'))
+    
+    fig_top.add_trace(go.Bar(
+        name='DB',
+        y=top_10_display['Code'].astype(str),
+        x=top_10_display['DB YTD'],
+        orientation='h',
+        marker_color='#22c55e',
+        text=top_10_display['DB YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+        textposition='inside'
+    ))
+    
+    # Marge als Text am Ende
+    for idx, row in top_10_display.iterrows():
+        fig_top.add_annotation(
+            x=row['Umsätze YTD'],
+            y=row['Code'],
+            text=f"{row['Marge YTD %']:.1f}%",
+            showarrow=False,
+            xanchor='left',
+            xshift=5,
+            font=dict(size=12, color='#059669' if row['Marge YTD %'] >= 10 else '#d97706')
+        )
+    
+    fig_top.update_layout(
+        barmode='stack',
+        height=400,
+        xaxis_title='Euro (€)',
+        yaxis=dict(autorange='reversed'),
+        showlegend=True,
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+    )
     st.plotly_chart(fig_top, use_container_width=True)
 
 # === WORST PERFORMER ===
@@ -207,31 +239,63 @@ if nl_worst != 'Gesamt' and has_nl:
 
 # Immer nach Marge % sortieren (niedrigste)
 worst_10 = df_worst.nsmallest(10, 'Marge YTD %')
-worst_10_display = worst_10[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']]
+worst_10_display = worst_10[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
+
+st.markdown("#### Tabelle & Chart")
 
 col1, col2 = st.columns([1, 1])
 with col1:
-    st.markdown("#### Tabelle")
     worst_display = worst_10_display.copy()
     worst_display['Kosten YTD'] = worst_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Umsätze YTD'] = worst_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['DB YTD'] = worst_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Marge YTD %'] = worst_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
-    st.dataframe(worst_display, use_container_width=True, hide_index=True)
+    st.dataframe(worst_display, use_container_width=True, hide_index=True, height=400)
 
 with col2:
-    st.markdown("#### Chart")
-    colors_marge = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in worst_10_display['Marge YTD %']]
-    fig_worst = go.Figure(go.Bar(
-        x=worst_10_display['Marge YTD %'],
+    # Gestapelter Balken: Kosten + DB = Umsatz
+    fig_worst = go.Figure()
+    
+    fig_worst.add_trace(go.Bar(
+        name='Kosten',
         y=worst_10_display['Code'].astype(str),
+        x=worst_10_display['Kosten YTD'],
         orientation='h',
-        marker_color=colors_marge,
-        text=worst_10_display['Marge YTD %'].apply(lambda x: f'{x:.1f}%'),
-        textposition='outside',
-        showlegend=False
+        marker_color='#ef4444',
+        text=worst_10_display['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k' if x != 0 else ''),
+        textposition='inside'
     ))
-    fig_worst.update_layout(height=400, xaxis_title='Marge (%)', yaxis=dict(autorange='reversed'))
+    
+    fig_worst.add_trace(go.Bar(
+        name='DB',
+        y=worst_10_display['Code'].astype(str),
+        x=worst_10_display['DB YTD'],
+        orientation='h',
+        marker_color='#22c55e' if worst_10_display['DB YTD'].min() >= 0 else '#ef4444',
+        text=worst_10_display['DB YTD'].apply(lambda x: f'€{x/1000:.0f}k' if x != 0 else ''),
+        textposition='inside'
+    ))
+    
+    # Marge als Text
+    for idx, row in worst_10_display.iterrows():
+        fig_worst.add_annotation(
+            x=row['Umsätze YTD'] if row['Umsätze YTD'] > 0 else row['Kosten YTD'],
+            y=row['Code'],
+            text=f"{row['Marge YTD %']:.1f}%",
+            showarrow=False,
+            xanchor='left',
+            xshift=5,
+            font=dict(size=12, color='#dc2626')
+        )
+    
+    fig_worst.update_layout(
+        barmode='stack',
+        height=400,
+        xaxis_title='Euro (€)',
+        yaxis=dict(autorange='reversed'),
+        showlegend=True,
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+    )
     st.plotly_chart(fig_worst, use_container_width=True)
 
 # === MONATSTABELLE ===
