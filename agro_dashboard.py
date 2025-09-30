@@ -40,9 +40,17 @@ def load_data(masterfile, nl_file):
     nl_df = pd.read_excel(nl_file)
     nl_map = dict(zip(nl_df.iloc[:, 2].str.upper().str.strip(), nl_df.iloc[:, 2].str.strip()))
     
-    # NL zuordnen
-    df['NL'] = df['Ordernr. klant'].apply(lambda x: find_nl(x, nl_map))
-    df['NL_Name'] = df['NL'].map(lambda x: nl_map.get(x, x) if x else None)
+    # NL zuordnen über Spalte G (Index 6) der Masterfile
+    # Diese Spalte enthält die Info die mit Spalte C (Index 2) der NL-Datei matcht
+    spalte_g = df.columns[6] if len(df.columns) > 6 else None
+    
+    if spalte_g:
+        df['NL'] = df[spalte_g].apply(lambda x: find_nl(x, nl_map))
+        df['NL_Name'] = df['NL'].map(lambda x: nl_map.get(x, x) if x else None)
+    else:
+        # Fallback: Versuche über andere Spalten
+        df['NL'] = None
+        df['NL_Name'] = None
     
     return df, nl_map
 
