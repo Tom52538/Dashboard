@@ -262,12 +262,94 @@ for month in months:
 df_table = pd.DataFrame(monthly_table)
 df_table['Marge %'] = (df_table['DB'] / df_table['Umsaetze'] * 100).fillna(0)
 
-st.dataframe(df_table.style.format({
-    'Kosten': '€ {:,.0f}',
-    'Umsaetze': '€ {:,.0f}',
-    'DB': '€ {:,.0f}',
-    'Marge %': '{:.1f}%'
-}), use_container_width=True)
+# Moderne Visualisierung statt einfacher Tabelle
+col1, col2 = st.columns(2)
+
+with col1:
+    # Heatmap-Style Tabelle mit Farbcodierung
+    def highlight_marge(val):
+        if isinstance(val, str) and '%' in val:
+            num = float(val.replace('%', '').replace(',', '.'))
+            if num >= 10:
+                return 'background-color: #d1fae5; color: #065f46; font-weight: bold'
+            elif num >= 5:
+                return 'background-color: #fef3c7; color: #92400e'
+            else:
+                return 'background-color: #fee2e2; color: #991b1b; font-weight: bold'
+        return ''
+    
+    def highlight_db(val):
+        if isinstance(val, str) and '€' in val:
+            num = float(val.replace('€', '').replace(',', '').strip())
+            if num >= 0:
+                return 'color: #059669; font-weight: bold'
+            else:
+                return 'color: #dc2626; font-weight: bold'
+        return ''
+    
+    styled_table = df_table.style.format({
+        'Kosten': '€ {:,.0f}',
+        'Umsaetze': '€ {:,.0f}',
+        'DB': '€ {:,.0f}',
+        'Marge %': '{:.1f}%'
+    }).applymap(highlight_marge, subset=['Marge %']).applymap(highlight_db, subset=['DB'])
+    
+    st.dataframe(styled_table, use_container_width=True, height=400)
+
+with col2:
+    # Sparkline-Charts für jeden Monat
+    fig_mini = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=('Monatliche Marge %', 'DB-Entwicklung (€)'),
+        row_heights=[0.5, 0.5]
+    )
+    
+    # Marge Trend
+    colors_trend = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in df_table['Marge %']]
+    fig_mini.add_trace(go.Bar(
+        x=df_table['Monat'],
+        y=df_table['Marge %'],
+        marker_color=colors_trend,
+        text=df_table['Marge %'].apply(lambda x: f'{x:.1f}%'),
+        textposition='outside',
+        showlegend=False
+    ), row=1, col=1)
+    
+    # DB Trend
+    fig_mini.add_trace(go.Scatter(
+        x=df_table['Monat'],
+        y=df_table['DB'],
+        mode='lines+markers',
+        line=dict(color='#3b82f6', width=3),
+        marker=dict(size=10),
+        fill='tozeroy',
+        fillcolor='rgba(59, 130, 246, 0.2)',
+        showlegend=False
+    ), row=2, col=1)
+    
+    fig_mini.update_layout(height=400, showlegend=False)
+    fig_mini.update_yaxes(title_text="Marge (%)", row=1, col=1)
+    fig_mini.update_yaxes(title_text="DB (€)", row=2, col=1)
+    
+    st.plotly_chart(fig_mini, use_container_width=True)
+
+# Zusätzliche Insights
+st.markdown("### Monatliche Insights")
+col1, col2, col3, col4 = st.columns(4)
+
+best_month = df_table.loc[df_table['Marge %'].idxmax()]
+worst_month = df_table.loc[df_table['Marge %'].idxmin()]
+highest_revenue = df_table.loc[df_table['Umsaetze'].idxmax()]
+total_db = df_table['DB'].sum()
+
+with col1:
+    st.metric("Bester Monat (Marge)", best_month['Monat'], f"{best_month['Marge %']:.1f}%")
+with col2:
+    st.metric("Schlechtester Monat (Marge)", worst_month['Monat'], f"{worst_month['Marge %']:.1f}%")
+with col3:
+    st.metric("Höchster Umsatz", highest_revenue['Monat'], f"€ {highest_revenue['Umsaetze']:,.0f}")
+with col4:
+    st.metric("Gesamt DB (YTD)", f"€ {total_db:,.0f}", f"{(total_db/df_table['Umsaetze'].sum()*100):.1f}%")
 
 # EXPORT
 st.download_button(
