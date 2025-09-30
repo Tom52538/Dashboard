@@ -223,10 +223,16 @@ def main():
                     annotation_text="Ziel: 20%",
                     annotation_position="right"
                 )
+                # Dynamischer Y-Achsen-Bereich für negative Margen
+                min_marge = monthly_df['Marge'].min()
+                max_marge = monthly_df['Marge'].max()
+                y_min = min(0, min_marge - 5)  # Mindestens 0 oder 5% unter kleinster Marge
+                y_max = max(30, max_marge + 5)  # Mindestens 30% oder 5% über größter Marge
+                
                 fig2.update_layout(
                     height=350, 
                     margin=dict(t=20, b=20, l=20, r=20),
-                    yaxis=dict(range=[0, max(30, monthly_df['Marge'].max() + 5)], ticksuffix='%'),
+                    yaxis=dict(range=[y_min, y_max], ticksuffix='%', zeroline=True, zerolinewidth=2, zerolinecolor='gray'),
                     legend=dict(orientation='h', y=-0.15),
                     hovermode='x unified'
                 )
