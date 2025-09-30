@@ -154,12 +154,13 @@ df_top = df_base.copy()
 if nl_top != 'Gesamt' and has_nl:
     df_top = df_top[df_top['Niederlassung'] == nl_top]
 
-top_10_umsatz = df_top.nlargest(10, 'Umsätze YTD')[['Code', 'Omschrijving', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']]
+top_10_umsatz = df_top.nlargest(10, 'Umsätze YTD')[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']]
 
 col1, col2 = st.columns([1, 1])
 with col1:
     st.markdown("#### Tabelle")
     top_display = top_10_umsatz.copy()
+    top_display['Kosten YTD'] = top_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Umsätze YTD'] = top_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Marge YTD %'] = top_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
@@ -167,7 +168,9 @@ with col1:
 
 with col2:
     st.markdown("#### Chart")
-    fig_top = go.Figure(go.Bar(
+    fig_top = go.Figure()
+    fig_top.add_trace(go.Bar(
+        name='Umsätze',
         x=top_10_umsatz['Umsätze YTD'],
         y=top_10_umsatz['Code'].astype(str),
         orientation='h',
@@ -175,7 +178,16 @@ with col2:
         text=top_10_umsatz['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
         textposition='outside'
     ))
-    fig_top.update_layout(height=400, xaxis_title='Umsatz YTD (€)', yaxis=dict(autorange='reversed'))
+    fig_top.add_trace(go.Bar(
+        name='Kosten',
+        x=top_10_umsatz['Kosten YTD'],
+        y=top_10_umsatz['Code'].astype(str),
+        orientation='h',
+        marker_color='#ef4444',
+        text=top_10_umsatz['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+        textposition='outside'
+    ))
+    fig_top.update_layout(height=400, xaxis_title='Euro (€)', yaxis=dict(autorange='reversed'), barmode='group')
     st.plotly_chart(fig_top, use_container_width=True)
 
 # === WORST PERFORMER ===
@@ -188,12 +200,13 @@ df_worst = df_base.copy()
 if nl_worst != 'Gesamt' and has_nl:
     df_worst = df_worst[df_worst['Niederlassung'] == nl_worst]
 
-worst_10_db = df_worst.nsmallest(10, 'DB YTD')[['Code', 'Omschrijving', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']]
+worst_10_db = df_worst.nsmallest(10, 'DB YTD')[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']]
 
 col1, col2 = st.columns([1, 1])
 with col1:
     st.markdown("#### Tabelle")
     worst_display = worst_10_db.copy()
+    worst_display['Kosten YTD'] = worst_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Umsätze YTD'] = worst_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['DB YTD'] = worst_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Marge YTD %'] = worst_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
@@ -201,15 +214,26 @@ with col1:
 
 with col2:
     st.markdown("#### Chart")
-    fig_worst = go.Figure(go.Bar(
-        x=worst_10_db['DB YTD'],
+    fig_worst = go.Figure()
+    fig_worst.add_trace(go.Bar(
+        name='Umsätze',
+        x=worst_10_db['Umsätze YTD'],
+        y=worst_10_db['Code'].astype(str),
+        orientation='h',
+        marker_color='#22c55e',
+        text=worst_10_db['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+        textposition='outside'
+    ))
+    fig_worst.add_trace(go.Bar(
+        name='Kosten',
+        x=worst_10_db['Kosten YTD'],
         y=worst_10_db['Code'].astype(str),
         orientation='h',
         marker_color='#ef4444',
-        text=worst_10_db['DB YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+        text=worst_10_db['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
         textposition='outside'
     ))
-    fig_worst.update_layout(height=400, xaxis_title='DB YTD (€)', yaxis=dict(autorange='reversed'))
+    fig_worst.update_layout(height=400, xaxis_title='Euro (€)', yaxis=dict(autorange='reversed'), barmode='group')
     st.plotly_chart(fig_worst, use_container_width=True)
 
 # === MONATSTABELLE ===
