@@ -6,7 +6,6 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 import os
 from io import BytesIO
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # Funktion für Excel-Export
 def to_excel(df):
@@ -27,43 +26,6 @@ def to_excel(df):
             worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
     
     return output.getvalue()
-
-def create_aggrid_table(df, height=400):
-    """Erstellt eine sortierbare AgGrid Tabelle mit deutlichen Sortier-Icons"""
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_default_column(
-        sortable=True, 
-        filterable=True, 
-        resizable=True,
-        suppressMenu=False
-    )
-    
-    # Aktiviere Sortier-Icons und mache sie sichtbarer
-    gb.configure_grid_options(
-        enableRangeSelection=True,
-        enableSorting=True,
-        alwaysShowVerticalScroll=False,
-        suppressDragLeaveHidesColumns=True
-    )
-    
-    gridOptions = gb.build()
-    
-    return AgGrid(
-        df,
-        gridOptions=gridOptions,
-        update_mode=GridUpdateMode.MODEL_CHANGED,
-        fit_columns_on_grid_load=True,
-        theme='alpine',  # Alpine theme hat deutlichere Sortier-Icons
-        height=height,
-        allow_unsafe_jscode=True,
-        enable_enterprise_modules=False,
-        custom_css={
-            # Mache Sortier-Icons größer und sichtbarer
-            ".ag-header-cell-sortable": {"cursor": "pointer !important"},
-            ".ag-icon": {"font-size": "16px !important"},
-            ".ag-header-cell-label": {"font-weight": "bold !important"}
-        }
-    )
 
 # Page Config
 st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
@@ -318,14 +280,29 @@ st.plotly_chart(fig, use_container_width=True)
 # === TOP PERFORMER ===
 st.header("Top 10 Maschinen (YTD)")
 
+# SORTIER-DROPDOWN - GROSS UND DEUTLICH
+st.markdown("### 🔽 Sortieren nach:")
+sort_top = st.selectbox(
+    "Wähle Sortierung für Top 10:",
+    ["DB YTD (Höchster Gewinn)", "Umsätze YTD (Höchster Umsatz)", "Marge YTD % (Beste Marge)", "Kosten YTD (Höchste Kosten)"],
+    key='sort_top_10'
+)
+
 # Top Performer nutzen gefilterte Basis
 df_top = df_base.copy()
 
 # Filtere nur relevante Maschinen (mindestens €1000 Umsatz)
 df_top_relevant = df_top[df_top['Umsätze YTD'] >= 1000]
 
-# Sortiere nach HÖCHSTEM DB (= hoher Umsatz + gute Marge) - ABSTEIGEND
-top_10 = df_top_relevant.nlargest(10, 'DB YTD')
+# Sortiere nach gewählter Option
+if "DB YTD" in sort_top:
+    top_10 = df_top_relevant.nlargest(10, 'DB YTD')
+elif "Umsätze YTD" in sort_top:
+    top_10 = df_top_relevant.nlargest(10, 'Umsätze YTD')
+elif "Marge YTD %" in sort_top:
+    top_10 = df_top_relevant.nlargest(10, 'Marge YTD %')
+else:  # Kosten
+    top_10 = df_top_relevant.nlargest(10, 'Kosten YTD')
 top_10_display = top_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 # Sortiere die Anzeige nach DB YTD absteigend (höchster DB zuerst)
@@ -405,14 +382,29 @@ with col2:
 # === WORST PERFORMER ===
 st.header("Worst 10 Maschinen (YTD)")
 
+# SORTIER-DROPDOWN - GROSS UND DEUTLICH
+st.markdown("### 🔽 Sortieren nach:")
+sort_worst = st.selectbox(
+    "Wähle Sortierung für Worst 10:",
+    ["DB YTD (Niedrigster/Negativster)", "Marge YTD % (Schlechteste Marge)", "Kosten YTD (Höchste Kosten)", "Umsätze YTD (Niedrigster Umsatz)"],
+    key='sort_worst_10'
+)
+
 # Worst Performer nutzen gefilterte Basis
 df_worst = df_base.copy()
 
 # Filtere nur relevante Maschinen (mindestens €1000 Kosten)
 df_worst_relevant = df_worst[df_worst['Kosten YTD'] >= 1000]
 
-# Sortiere nach NIEDRIGSTEM DB (= hohe Kosten + schlechte Marge) - AUFSTEIGEND
-worst_10 = df_worst_relevant.nsmallest(10, 'DB YTD')
+# Sortiere nach gewählter Option
+if "DB YTD" in sort_worst:
+    worst_10 = df_worst_relevant.nsmallest(10, 'DB YTD')
+elif "Marge YTD %" in sort_worst:
+    worst_10 = df_worst_relevant.nsmallest(10, 'Marge YTD %')
+elif "Kosten YTD" in sort_worst:
+    worst_10 = df_worst_relevant.nlargest(10, 'Kosten YTD')
+else:  # Umsätze
+    worst_10 = df_worst_relevant.nsmallest(10, 'Umsätze YTD')
 worst_10_display = worst_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 # Sortiere die Anzeige nach DB YTD aufsteigend (niedrigster DB zuerst)
@@ -543,7 +535,7 @@ with col1:
         'Marge %': '{:.1f}%'
     }).applymap(highlight_marge, subset=['Marge %']).applymap(highlight_db, subset=['DB'])
     
-    create_aggrid_table(styled_table.data, height=400)
+    st.dataframe(styled_table, use_container_width=True, height=400)
     
     # Excel-Export-Button direkt unter der Tabelle
     st.download_button(
@@ -662,7 +654,7 @@ with col1:
     display_no_rev = df_no_revenue_display.copy()
     display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
     display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
-    create_aggrid_table(display_no_rev, height=500)
+    st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=500)
     
     # Excel-Export-Buttons direkt unter der Tabelle
     col_btn1, col_btn2 = st.columns(2)
@@ -810,7 +802,7 @@ if has_product_cols:
         display_products['DB YTD'] = display_products['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
         display_products['Marge %'] = display_products['Marge %'].apply(lambda x: f"{x:.1f}%")
         
-        create_aggrid_table(display_products, height=400)
+        st.dataframe(display_products, use_container_width=True, hide_index=True)
         
         # Export
         st.download_button(
@@ -823,8 +815,15 @@ if has_product_cols:
         # Top Produkte (nach Group)
         if '2. Product Group' in df_products.columns:
             st.markdown("---")
-            st.markdown("#### Top 10 Product Groups")
-            st.caption("💡 Klicke auf Spaltenüberschriften zum Sortieren")
+            st.markdown("#### Top 20 Product Groups")
+            
+            # SORTIER-DROPDOWN - GROSS UND DEUTLICH
+            st.markdown("### 🔽 Sortieren nach:")
+            sort_groups = st.selectbox(
+                "Wähle Sortierung für Product Groups:",
+                ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
+                key='sort_product_groups'
+            )
             
             product_group_stats = df_products.groupby('2. Product Group').agg({
                 'VH-nr.': 'count',
@@ -835,8 +834,15 @@ if has_product_cols:
             product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
             product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
             
-            # Zeige Top 20 statt Top 10 (mehr Daten zum Sortieren)
-            product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
+            # Sortiere nach gewählter Option
+            if "Umsätze YTD" in sort_groups:
+                product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
+            elif "DB YTD" in sort_groups:
+                product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
+            elif "Marge %" in sort_groups:
+                product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
+            else:  # Anzahl
+                product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
             
             col1, col2 = st.columns([1, 1])
             
@@ -847,7 +853,7 @@ if has_product_cols:
                 display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
                 display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
                 
-                create_aggrid_table(display_groups, height=400)
+                st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
             
             with col2:
                 fig_groups = go.Figure()
