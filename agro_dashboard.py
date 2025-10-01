@@ -15,7 +15,11 @@ st.title("AGRO F66 Maschinen Dashboard")
 def load_data():
     """Lädt Dashboard_Master.xlsx direkt aus dem Repository"""
     try:
-        df = pd.read_excel("Dashboard_Master.xlsx")
+        df = pd.read_excel("Dashboard_Master.xlsx", dtype={'VH-nr.': str})
+        
+        # VH-Nr. als Text sicherstellen (falls trotzdem als Zahl gelesen)
+        if 'VH-nr.' in df.columns:
+            df['VH-nr.'] = df['VH-nr.'].astype(str).str.strip()
         
         # Automatische Bereinigung: Runde alle numerischen Werte auf 2 Dezimalstellen
         kosten_spalten = [col for col in df.columns if 'Kosten' in col]
@@ -214,15 +218,19 @@ if nl_top != 'Gesamt' and has_nl:
 # Filtere nur relevante Maschinen (mindestens €1000 Umsatz)
 df_top_relevant = df_top[df_top['Umsätze YTD'] >= 1000]
 
-# Sortiere nach HÖCHSTEM DB (= hoher Umsatz + gute Marge)
+# Sortiere nach HÖCHSTEM DB (= hoher Umsatz + gute Marge) - ABSTEIGEND
 top_10 = df_top_relevant.nlargest(10, 'DB YTD')
 top_10_display = top_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
+
+# Sortiere die Anzeige nach DB YTD absteigend (höchster DB zuerst)
+top_10_display = top_10_display.sort_values('DB YTD', ascending=False)
 
 st.markdown("#### Tabelle & Chart")
 
 col1, col2 = st.columns([1, 1])
 with col1:
     top_display = top_10_display.copy()
+    top_display['VH-nr.'] = top_display['VH-nr.'].astype(str)  # Als Text anzeigen
     top_display['Kosten YTD'] = top_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Umsätze YTD'] = top_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
@@ -292,15 +300,19 @@ if nl_worst != 'Gesamt' and has_nl:
 # Filtere nur relevante Maschinen (mindestens €1000 Kosten)
 df_worst_relevant = df_worst[df_worst['Kosten YTD'] >= 1000]
 
-# Sortiere nach NIEDRIGSTEM DB (= hohe Kosten + schlechte Marge)
+# Sortiere nach NIEDRIGSTEM DB (= hohe Kosten + schlechte Marge) - AUFSTEIGEND
 worst_10 = df_worst_relevant.nsmallest(10, 'DB YTD')
 worst_10_display = worst_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
+
+# Sortiere die Anzeige nach DB YTD aufsteigend (niedrigster DB zuerst)
+worst_10_display = worst_10_display.sort_values('DB YTD', ascending=True)
 
 st.markdown("#### Tabelle & Chart")
 
 col1, col2 = st.columns([1, 1])
 with col1:
     worst_display = worst_10_display.copy()
+    worst_display['VH-nr.'] = worst_display['VH-nr.'].astype(str)  # Als Text anzeigen
     worst_display['Kosten YTD'] = worst_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Umsätze YTD'] = worst_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['DB YTD'] = worst_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
