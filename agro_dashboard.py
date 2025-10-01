@@ -29,10 +29,23 @@ def to_excel(df):
     return output.getvalue()
 
 def create_aggrid_table(df, height=400):
-    """Erstellt eine sortierbare AgGrid Tabelle"""
+    """Erstellt eine sortierbare AgGrid Tabelle mit deutlichen Sortier-Icons"""
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_default_column(sortable=True, filterable=True, resizable=True)
-    gb.configure_side_bar()
+    gb.configure_default_column(
+        sortable=True, 
+        filterable=True, 
+        resizable=True,
+        suppressMenu=False
+    )
+    
+    # Aktiviere Sortier-Icons und mache sie sichtbarer
+    gb.configure_grid_options(
+        enableRangeSelection=True,
+        enableSorting=True,
+        alwaysShowVerticalScroll=False,
+        suppressDragLeaveHidesColumns=True
+    )
+    
     gridOptions = gb.build()
     
     return AgGrid(
@@ -40,9 +53,16 @@ def create_aggrid_table(df, height=400):
         gridOptions=gridOptions,
         update_mode=GridUpdateMode.MODEL_CHANGED,
         fit_columns_on_grid_load=True,
-        theme='streamlit',
+        theme='alpine',  # Alpine theme hat deutlichere Sortier-Icons
         height=height,
-        allow_unsafe_jscode=True
+        allow_unsafe_jscode=True,
+        enable_enterprise_modules=False,
+        custom_css={
+            # Mache Sortier-Icons größer und sichtbarer
+            ".ag-header-cell-sortable": {"cursor": "pointer !important"},
+            ".ag-icon": {"font-size": "16px !important"},
+            ".ag-header-cell-label": {"font-weight": "bold !important"}
+        }
     )
 
 # Page Config
@@ -804,13 +824,7 @@ if has_product_cols:
         if '2. Product Group' in df_products.columns:
             st.markdown("---")
             st.markdown("#### Top 10 Product Groups")
-            
-            # Sortier-Option
-            sort_option = st.selectbox(
-                "Sortieren nach:",
-                ["Umsätze YTD", "DB YTD", "Marge %", "Anzahl"],
-                key='product_group_sort'
-            )
+            st.caption("💡 Klicke auf Spaltenüberschriften zum Sortieren")
             
             product_group_stats = df_products.groupby('2. Product Group').agg({
                 'VH-nr.': 'count',
@@ -821,22 +835,8 @@ if has_product_cols:
             product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
             product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
             
-            # Sortiere nach gewählter Option
-            sort_col_map = {
-                "Umsätze YTD": "Umsätze YTD",
-                "DB YTD": "DB YTD",
-                "Marge %": "Marge %",
-                "Anzahl": "Anzahl"
-            }
-            
-            # Sortiere ABSTEIGEND (höchste Werte zuerst)
-            product_group_stats = product_group_stats.sort_values(
-                sort_col_map[sort_option], 
-                ascending=False
-            ).head(10)
-            
-            # Reset index damit die Sortierung korrekt angezeigt wird
-            product_group_stats = product_group_stats.reset_index(drop=True)
+            # Zeige Top 20 statt Top 10 (mehr Daten zum Sortieren)
+            product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
             
             col1, col2 = st.columns([1, 1])
             
