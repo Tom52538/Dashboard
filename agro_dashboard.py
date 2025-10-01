@@ -202,7 +202,7 @@ fig.update_yaxes(title_text="Euro (€)", row=2, col=2)
 st.plotly_chart(fig, use_container_width=True)
 
 # === TOP PERFORMER ===
-st.header("Top 10 Maschinen nach Marge % (YTD)")
+st.header("Top 10 Maschinen (YTD)")
 col_filter3, col_space3 = st.columns([1, 3])
 with col_filter3:
     nl_top = st.selectbox("NL-Filter Top Performer", nl_options, key='nl_top')
@@ -211,9 +211,12 @@ df_top = df_base.copy()
 if nl_top != 'Gesamt' and has_nl:
     df_top = df_top[df_top['Niederlassung'] == nl_top]
 
-# Immer nach Marge % sortieren
-top_10 = df_top.nlargest(10, 'Marge YTD %')
-top_10_display = top_10[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
+# Filtere nur relevante Maschinen (mindestens €1000 Umsatz)
+df_top_relevant = df_top[df_top['Umsätze YTD'] >= 1000]
+
+# Sortiere nach HÖCHSTEM DB (= hoher Umsatz + gute Marge)
+top_10 = df_top_relevant.nlargest(10, 'DB YTD')
+top_10_display = top_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 st.markdown("#### Tabelle & Chart")
 
@@ -230,9 +233,12 @@ with col2:
     # Gestapelter Balken: Kosten + DB = Umsatz
     fig_top = go.Figure()
     
+    # Y-Achsen Label: VH-Nr. + Code
+    y_labels = top_10_display['VH-nr.'].astype(str) + ' | ' + top_10_display['Code'].astype(str)
+    
     fig_top.add_trace(go.Bar(
         name='Kosten',
-        y=top_10_display['Code'].astype(str),
+        y=y_labels,
         x=top_10_display['Kosten YTD'],
         orientation='h',
         marker_color='#ef4444',
@@ -242,7 +248,7 @@ with col2:
     
     fig_top.add_trace(go.Bar(
         name='DB',
-        y=top_10_display['Code'].astype(str),
+        y=y_labels,
         x=top_10_display['DB YTD'],
         orientation='h',
         marker_color='#22c55e',
@@ -252,9 +258,10 @@ with col2:
     
     # Marge als Text am Ende
     for idx, row in top_10_display.iterrows():
+        y_label = str(row['VH-nr.']) + ' | ' + str(row['Code'])
         fig_top.add_annotation(
             x=row['Umsätze YTD'],
-            y=row['Code'],
+            y=y_label,
             text=f"{row['Marge YTD %']:.1f}%",
             showarrow=False,
             xanchor='left',
@@ -273,7 +280,7 @@ with col2:
     st.plotly_chart(fig_top, use_container_width=True)
 
 # === WORST PERFORMER ===
-st.header("Worst 10 Maschinen nach Marge % (YTD)")
+st.header("Worst 10 Maschinen (YTD)")
 col_filter4, col_space4 = st.columns([1, 3])
 with col_filter4:
     nl_worst = st.selectbox("NL-Filter Worst Performer", nl_options, key='nl_worst')
@@ -282,9 +289,12 @@ df_worst = df_base.copy()
 if nl_worst != 'Gesamt' and has_nl:
     df_worst = df_worst[df_worst['Niederlassung'] == nl_worst]
 
-# Immer nach Marge % sortieren (niedrigste)
-worst_10 = df_worst.nsmallest(10, 'Marge YTD %')
-worst_10_display = worst_10[['Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
+# Filtere nur relevante Maschinen (mindestens €1000 Kosten)
+df_worst_relevant = df_worst[df_worst['Kosten YTD'] >= 1000]
+
+# Sortiere nach NIEDRIGSTEM DB (= hohe Kosten + schlechte Marge)
+worst_10 = df_worst_relevant.nsmallest(10, 'DB YTD')
+worst_10_display = worst_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 st.markdown("#### Tabelle & Chart")
 
@@ -301,9 +311,12 @@ with col2:
     # Gestapelter Balken: Kosten + DB = Umsatz
     fig_worst = go.Figure()
     
+    # Y-Achsen Label: VH-Nr. + Code
+    y_labels_worst = worst_10_display['VH-nr.'].astype(str) + ' | ' + worst_10_display['Code'].astype(str)
+    
     fig_worst.add_trace(go.Bar(
         name='Kosten',
-        y=worst_10_display['Code'].astype(str),
+        y=y_labels_worst,
         x=worst_10_display['Kosten YTD'],
         orientation='h',
         marker_color='#ef4444',
@@ -313,7 +326,7 @@ with col2:
     
     fig_worst.add_trace(go.Bar(
         name='DB',
-        y=worst_10_display['Code'].astype(str),
+        y=y_labels_worst,
         x=worst_10_display['DB YTD'],
         orientation='h',
         marker_color='#22c55e' if worst_10_display['DB YTD'].min() >= 0 else '#ef4444',
@@ -323,9 +336,10 @@ with col2:
     
     # Marge als Text
     for idx, row in worst_10_display.iterrows():
+        y_label = str(row['VH-nr.']) + ' | ' + str(row['Code'])
         fig_worst.add_annotation(
             x=row['Umsätze YTD'] if row['Umsätze YTD'] > 0 else row['Kosten YTD'],
-            y=row['Code'],
+            y=y_label,
             text=f"{row['Marge YTD %']:.1f}%",
             showarrow=False,
             xanchor='left',
