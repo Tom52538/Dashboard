@@ -3,22 +3,67 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from datetime import datetime
+import os
 
 st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
 
 st.title("AGRO F66 Maschinen Dashboard")
 
-uploaded_file = st.file_uploader("Dashboard_Master.xlsx hochladen", type=['xlsx'])
+# Daten laden - OHNE File Upload!
+@st.cache_data(ttl=86400)  # Cache für 24 Stunden
+def load_data():
+    """Lädt Dashboard_Master.xlsx direkt aus dem Repository"""
+    try:
+        df = pd.read_excel("Dashboard_Master.xlsx")
+        
+        # Automatische Bereinigung: Runde alle numerischen Werte auf 2 Dezimalstellen
+        kosten_spalten = [col for col in df.columns if 'Kosten' in col]
+        umsatz_spalten = [col for col in df.columns if 'Umsätze' in col]
+        db_spalten = [col for col in df.columns if 'DB' in col]
+        
+        for col in kosten_spalten + umsatz_spalten + db_spalten:
+            if col in df.columns:
+                df[col] = df[col].round(2)
+        
+        return df
+    except FileNotFoundError:
+        st.error("❌ Dashboard_Master.xlsx nicht gefunden! Bitte stelle sicher, dass die Datei im Repository liegt.")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ Fehler beim Laden der Daten: {e}")
+        st.stop()
 
-@st.cache_data
-def load_data(file):
-    return pd.read_excel(file)
+def get_file_info():
+    """Zeigt Datei-Informationen"""
+    if os.path.exists("Dashboard_Master.xlsx"):
+        timestamp = os.path.getmtime("Dashboard_Master.xlsx")
+        last_update = datetime.fromtimestamp(timestamp).strftime("%d.%m.%Y %H:%M")
+        file_size = os.path.getsize("Dashboard_Master.xlsx") / (1024 * 1024)  # MB
+        return last_update, file_size
+    return "Unbekannt", 0
 
-if uploaded_file is None:
-    st.info("Bitte lade die Dashboard_Master.xlsx hoch")
-    st.stop()
+# Info-Banner
+last_update, file_size = get_file_info()
+col_info1, col_info2, col_info3 = st.columns(3)
 
-df = load_data(uploaded_file)
+with col_info1:
+    st.info(f"📅 **Letztes Update:** {last_update}")
+with col_info2:
+    st.info(f"💾 **Dateigröße:** {file_size:.2f} MB")
+
+# Daten laden
+df = load_data()
+
+with col_info3:
+    st.success(f"✅ **{len(df):,} Datensätze** geladen")
+
+# Cache-Clear Button (für manuelle Updates)
+if st.button("🔄 Daten neu laden"):
+    st.cache_data.clear()
+    st.rerun()
+
+st.markdown("---")
 
 # Monate extrahieren
 cost_cols = [col for col in df.columns if col.startswith('Kosten ') and 'YTD' not in col]
@@ -34,7 +79,7 @@ else:
 
 # Globaler YTD Filter in Sidebar
 st.sidebar.header("Globale Filter")
-show_active = st.sidebar.checkbox("Nur Maschinen mit YTD-Aktivitaet", value=True)
+show_active = st.sidebar.checkbox("Nur Maschinen mit YTD-Aktivität", value=True)
 
 # Basis-Filterung
 df_base = df.copy()
@@ -415,7 +460,7 @@ with col4:
 
 # EXPORT
 st.download_button(
-    label="Export als CSV",
+    label="📥 Export als CSV",
     data=df_table.to_csv(index=False).encode('utf-8'),
     file_name=f'dashboard_export_{nl_table}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
     mime='text/csv'
