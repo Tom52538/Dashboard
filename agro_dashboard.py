@@ -303,6 +303,7 @@ elif "Marge YTD %" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Marge YTD %')
 else:  # Kosten
     top_10 = df_top_relevant.nlargest(10, 'Kosten YTD')
+
 top_10_display = top_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 # Sortiere die Anzeige nach DB YTD absteigend (höchster DB zuerst)
@@ -313,7 +314,7 @@ st.markdown("#### Tabelle & Chart")
 col1, col2 = st.columns([1, 1])
 with col1:
     top_display = top_10_display.copy()
-    top_display['VH-nr.'] = top_display['VH-nr.'].astype(str)  # Als Text anzeigen
+    top_display['VH-nr.'] = top_display['VH-nr.'].astype(str)
     top_display['Kosten YTD'] = top_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Umsätze YTD'] = top_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
@@ -405,6 +406,7 @@ elif "Kosten YTD" in sort_worst:
     worst_10 = df_worst_relevant.nlargest(10, 'Kosten YTD')
 else:  # Umsätze
     worst_10 = df_worst_relevant.nsmallest(10, 'Umsätze YTD')
+
 worst_10_display = worst_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 # Sortiere die Anzeige nach DB YTD aufsteigend (niedrigster DB zuerst)
@@ -415,7 +417,7 @@ st.markdown("#### Tabelle & Chart")
 col1, col2 = st.columns([1, 1])
 with col1:
     worst_display = worst_10_display.copy()
-    worst_display['VH-nr.'] = worst_display['VH-nr.'].astype(str)  # Als Text anzeigen
+    worst_display['VH-nr.'] = worst_display['VH-nr.'].astype(str)
     worst_display['Kosten YTD'] = worst_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Umsätze YTD'] = worst_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['DB YTD'] = worst_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
@@ -601,8 +603,6 @@ with col3:
 with col4:
     st.metric("Gesamt DB (YTD)", f"€ {total_db:,.0f}", f"{(total_db/df_table['Umsaetze'].sum()*100):.1f}%")
 
-# EXPORT (gelöscht - jetzt direkt unter den Tabellen)
-
 # === MASCHINEN OHNE UMSÄTZE ===
 st.header("⚠️ Maschinen ohne Umsätze (nur Kosten)")
 st.markdown("Diese Maschinen verursachen Kosten aber generieren keinen Umsatz")
@@ -705,8 +705,6 @@ with col2:
     else:
         st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
 
-# (Export-Buttons jetzt oben unter der Tabelle)
-
 # === PRODUKTANALYSE ===
 if has_product_cols:
     st.header("📦 Produktanalyse")
@@ -726,7 +724,6 @@ if has_product_cols:
         
         product_family_stats.columns = ['Product Family', 'Anzahl', 'Kosten YTD', 'Umsätze YTD', 'DB YTD']
         product_family_stats['Marge %'] = (product_family_stats['DB YTD'] / product_family_stats['Umsätze YTD'] * 100).fillna(0)
-        product_family_stats = product_family_stats.sort_values('Umsätze YTD', ascending=False)
         
         # Metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -746,14 +743,17 @@ if has_product_cols:
         with col_left:
             st.markdown("#### Umsatz nach Product Family")
             
+            # Sortiere für Chart nach Umsatz
+            product_family_chart = product_family_stats.sort_values('Umsätze YTD', ascending=False)
+            
             fig_family = go.Figure()
             
             fig_family.add_trace(go.Bar(
-                y=product_family_stats['Product Family'],
-                x=product_family_stats['Umsätze YTD'],
+                y=product_family_chart['Product Family'],
+                x=product_family_chart['Umsätze YTD'],
                 orientation='h',
                 marker_color='#22c55e',
-                text=product_family_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+                text=product_family_chart['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
                 textposition='outside',
                 name='Umsatz'
             ))
@@ -770,16 +770,19 @@ if has_product_cols:
         with col_right:
             st.markdown("#### Marge % nach Product Family")
             
-            colors_marge = ['#22c55e' if x >= 20 else '#f59e0b' if x >= 10 else '#ef4444' for x in product_family_stats['Marge %']]
+            # Sortiere für Chart nach Marge
+            product_family_marge_chart = product_family_stats.sort_values('Marge %', ascending=False)
+            
+            colors_marge = ['#22c55e' if x >= 20 else '#f59e0b' if x >= 10 else '#ef4444' for x in product_family_marge_chart['Marge %']]
             
             fig_marge = go.Figure()
             
             fig_marge.add_trace(go.Bar(
-                y=product_family_stats['Product Family'],
-                x=product_family_stats['Marge %'],
+                y=product_family_marge_chart['Product Family'],
+                x=product_family_marge_chart['Marge %'],
                 orientation='h',
                 marker_color=colors_marge,
-                text=product_family_stats['Marge %'].apply(lambda x: f'{x:.1f}%'),
+                text=product_family_marge_chart['Marge %'].apply(lambda x: f'{x:.1f}%'),
                 textposition='outside'
             ))
             
@@ -794,6 +797,26 @@ if has_product_cols:
         
         # Product Mix Tabelle
         st.markdown("#### Produkt-Mix Übersicht")
+        
+        # SORTIER-DROPDOWN - GROSS UND DEUTLICH
+        st.markdown("### 🔽 Sortieren nach:")
+        sort_product_mix = st.selectbox(
+            "Wähle Sortierung für Produkt-Mix:",
+            ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)", "Kosten YTD (Höchste)"],
+            key='sort_product_mix'
+        )
+        
+        # Sortiere nach gewählter Option
+        if "Umsätze YTD" in sort_product_mix:
+            product_family_stats = product_family_stats.sort_values('Umsätze YTD', ascending=False)
+        elif "DB YTD" in sort_product_mix:
+            product_family_stats = product_family_stats.sort_values('DB YTD', ascending=False)
+        elif "Marge %" in sort_product_mix:
+            product_family_stats = product_family_stats.sort_values('Marge %', ascending=False)
+        elif "Anzahl" in sort_product_mix:
+            product_family_stats = product_family_stats.sort_values('Anzahl', ascending=False)
+        else:  # Kosten YTD
+            product_family_stats = product_family_stats.sort_values('Kosten YTD', ascending=False)
         
         display_products = product_family_stats.copy()
         display_products['Anzahl'] = display_products['Anzahl'].apply(lambda x: f"{x:,}")
@@ -877,5 +900,3 @@ if has_product_cols:
                 st.plotly_chart(fig_groups, use_container_width=True)
     else:
         st.info("Keine Daten für Produktanalyse verfügbar. Bitte Filter anpassen.")
-
-# === MASCHINEN OHNE UMSÄTZE ===
