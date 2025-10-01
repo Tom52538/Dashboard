@@ -115,6 +115,39 @@ master_nl_filter = st.sidebar.selectbox(
     key='master_nl'
 )
 
+# PRODUKT-FILTER
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📦 Produkt-Filter")
+
+# Prüfe ob Produktspalten vorhanden sind
+has_product_cols = '1. Product Family' in df.columns
+
+if has_product_cols:
+    # Product Family Filter
+    product_families = ['Alle'] + sorted([fam for fam in df['1. Product Family'].dropna().unique() if str(fam) != 'nan'])
+    selected_family = st.sidebar.selectbox(
+        "Product Family",
+        product_families,
+        key='product_family'
+    )
+    
+    # Product Group Filter (abhängig von Family)
+    if selected_family != 'Alle':
+        df_filtered_for_group = df[df['1. Product Family'] == selected_family]
+    else:
+        df_filtered_for_group = df
+    
+    product_groups = ['Alle'] + sorted([grp for grp in df_filtered_for_group['2. Product Group'].dropna().unique() if str(grp) != 'nan'])
+    selected_group = st.sidebar.selectbox(
+        "Product Group",
+        product_groups,
+        key='product_group'
+    )
+else:
+    selected_family = 'Alle'
+    selected_group = 'Alle'
+    st.sidebar.warning("Keine Produktinformationen verfügbar. Bitte Master-Datei mit Produktinfo erweitern.")
+
 st.sidebar.markdown("---")
 
 show_active = st.sidebar.checkbox("Nur Maschinen mit YTD-Aktivität", value=True)
@@ -128,8 +161,18 @@ if show_active:
 if master_nl_filter != 'Gesamt' and has_nl:
     df_base = df_base[df_base['Niederlassung'] == master_nl_filter]
 
+# Produkt-Filter anwenden
+if has_product_cols:
+    if selected_family != 'Alle':
+        df_base = df_base[df_base['1. Product Family'] == selected_family]
+    
+    if selected_group != 'Alle':
+        df_base = df_base[df_base['2. Product Group'] == selected_group]
+
 st.sidebar.metric("Gefilterte Maschinen", f"{len(df_base):,}")
 st.sidebar.metric("Ausgewählte NL", master_nl_filter)
+if has_product_cols and selected_family != 'Alle':
+    st.sidebar.metric("Produkt-Filter", f"{selected_family}")
 
 # === ÜBERSICHT SEKTION ===
 st.header("Übersicht")
@@ -261,6 +304,15 @@ with col1:
     top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Marge YTD %'] = top_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
     st.dataframe(top_display, use_container_width=True, hide_index=True, height=400)
+    
+    # Excel-Export-Button direkt unter der Tabelle
+    st.download_button(
+        label="📥 Export Top 10 (Excel)",
+        data=to_excel(top_10_display),
+        file_name=f'top_10_maschinen_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        use_container_width=True
+    )
 
 with col2:
     # Gestapelter Balken: Kosten + DB = Umsatz
@@ -339,6 +391,15 @@ with col1:
     worst_display['DB YTD'] = worst_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Marge YTD %'] = worst_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
     st.dataframe(worst_display, use_container_width=True, hide_index=True, height=400)
+    
+    # Excel-Export-Button direkt unter der Tabelle
+    st.download_button(
+        label="📥 Export Worst 10 (Excel)",
+        data=to_excel(worst_10_display),
+        file_name=f'worst_10_maschinen_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        use_container_width=True
+    )
 
 with col2:
     # Gestapelter Balken: Kosten + DB = Umsatz
@@ -445,6 +506,15 @@ with col1:
     }).applymap(highlight_marge, subset=['Marge %']).applymap(highlight_db, subset=['DB'])
     
     st.dataframe(styled_table, use_container_width=True, height=400)
+    
+    # Excel-Export-Button direkt unter der Tabelle
+    st.download_button(
+        label="📥 Export Monatsdaten (Excel)",
+        data=to_excel(df_table),
+        file_name=f'monatsdaten_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        use_container_width=True
+    )
 
 with col2:
     # Sparkline-Charts für jeden Monat
@@ -501,24 +571,7 @@ with col3:
 with col4:
     st.metric("Gesamt DB (YTD)", f"€ {total_db:,.0f}", f"{(total_db/df_table['Umsaetze'].sum()*100):.1f}%")
 
-# EXPORT
-col_exp1, col_exp2 = st.columns(2)
-
-with col_exp1:
-    st.download_button(
-        label="📥 Export als Excel",
-        data=to_excel(df_table),
-        file_name=f'dashboard_monatsdaten_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-
-with col_exp2:
-    st.download_button(
-        label="📄 Export als CSV",
-        data=df_table.to_csv(index=False).encode('utf-8'),
-        file_name=f'dashboard_monatsdaten_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
-        mime='text/csv'
-    )
+# EXPORT (gelöscht - jetzt direkt unter den Tabellen)
 
 # === MASCHINEN OHNE UMSÄTZE ===
 st.header("⚠️ Maschinen ohne Umsätze (nur Kosten)")
@@ -572,6 +625,25 @@ with col1:
     display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
     display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=500)
+    
+    # Excel-Export-Buttons direkt unter der Tabelle
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        st.download_button(
+            label="📥 Export Alle (Excel)",
+            data=to_excel(df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']]),
+            file_name=f'maschinen_ohne_umsaetze_alle_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            use_container_width=True
+        )
+    with col_btn2:
+        st.download_button(
+            label="📥 Export Top 80/20 (Excel)",
+            data=to_excel(df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']]),
+            file_name=f'maschinen_ohne_umsaetze_pareto_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            use_container_width=True
+        )
 
 with col2:
     # Chart: Kosten-Verteilung (Top 10 aus Pareto-Maschinen)
@@ -603,22 +675,159 @@ with col2:
     else:
         st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
 
-# Export für diese Sektion
-if len(df_no_revenue) > 0:
-    col_exp1, col_exp2 = st.columns(2)
+# (Export-Buttons jetzt oben unter der Tabelle)
+
+# === PRODUKTANALYSE ===
+if has_product_cols:
+    st.header("📦 Produktanalyse")
     
-    with col_exp1:
+    # Check ob gefilterte Daten verfügbar sind
+    df_products = df_base.copy()
+    
+    if len(df_products) > 0 and '1. Product Family' in df_products.columns:
+        
+        # Aggregiere nach Product Family
+        product_family_stats = df_products.groupby('1. Product Family').agg({
+            'VH-nr.': 'count',
+            'Kosten YTD': 'sum',
+            'Umsätze YTD': 'sum',
+            'DB YTD': 'sum'
+        }).reset_index()
+        
+        product_family_stats.columns = ['Product Family', 'Anzahl', 'Kosten YTD', 'Umsätze YTD', 'DB YTD']
+        product_family_stats['Marge %'] = (product_family_stats['DB YTD'] / product_family_stats['Umsätze YTD'] * 100).fillna(0)
+        product_family_stats = product_family_stats.sort_values('Umsätze YTD', ascending=False)
+        
+        # Metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Produkt-Kategorien", len(product_family_stats))
+        with col2:
+            st.metric("Gesamt Umsatz", f"€ {product_family_stats['Umsätze YTD'].sum():,.0f}")
+        with col3:
+            st.metric("Gesamt DB", f"€ {product_family_stats['DB YTD'].sum():,.0f}")
+        with col4:
+            avg_marge = (product_family_stats['DB YTD'].sum() / product_family_stats['Umsätze YTD'].sum() * 100) if product_family_stats['Umsätze YTD'].sum() > 0 else 0
+            st.metric("Ø Marge", f"{avg_marge:.1f}%")
+        
+        # Charts
+        col_left, col_right = st.columns(2)
+        
+        with col_left:
+            st.markdown("#### Umsatz nach Product Family")
+            
+            fig_family = go.Figure()
+            
+            fig_family.add_trace(go.Bar(
+                y=product_family_stats['Product Family'],
+                x=product_family_stats['Umsätze YTD'],
+                orientation='h',
+                marker_color='#22c55e',
+                text=product_family_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+                textposition='outside',
+                name='Umsatz'
+            ))
+            
+            fig_family.update_layout(
+                height=400,
+                xaxis_title='Umsatz (€)',
+                yaxis=dict(autorange='reversed'),
+                showlegend=False
+            )
+            
+            st.plotly_chart(fig_family, use_container_width=True)
+        
+        with col_right:
+            st.markdown("#### Marge % nach Product Family")
+            
+            colors_marge = ['#22c55e' if x >= 20 else '#f59e0b' if x >= 10 else '#ef4444' for x in product_family_stats['Marge %']]
+            
+            fig_marge = go.Figure()
+            
+            fig_marge.add_trace(go.Bar(
+                y=product_family_stats['Product Family'],
+                x=product_family_stats['Marge %'],
+                orientation='h',
+                marker_color=colors_marge,
+                text=product_family_stats['Marge %'].apply(lambda x: f'{x:.1f}%'),
+                textposition='outside'
+            ))
+            
+            fig_marge.update_layout(
+                height=400,
+                xaxis_title='Marge (%)',
+                yaxis=dict(autorange='reversed'),
+                showlegend=False
+            )
+            
+            st.plotly_chart(fig_marge, use_container_width=True)
+        
+        # Product Mix Tabelle
+        st.markdown("#### Produkt-Mix Übersicht")
+        
+        display_products = product_family_stats.copy()
+        display_products['Anzahl'] = display_products['Anzahl'].apply(lambda x: f"{x:,}")
+        display_products['Kosten YTD'] = display_products['Kosten YTD'].apply(lambda x: f"€ {x:,.0f}")
+        display_products['Umsätze YTD'] = display_products['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
+        display_products['DB YTD'] = display_products['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
+        display_products['Marge %'] = display_products['Marge %'].apply(lambda x: f"{x:.1f}%")
+        
+        st.dataframe(display_products, use_container_width=True, hide_index=True)
+        
+        # Export
         st.download_button(
-            label="📥 Export Alle (Excel)",
-            data=to_excel(df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']]),
-            file_name=f'maschinen_ohne_umsaetze_alle_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+            label="📥 Export Produktanalyse (Excel)",
+            data=to_excel(product_family_stats),
+            file_name=f'produktanalyse_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-    
-    with col_exp2:
-        st.download_button(
-            label="📥 Export Top (80/20) Excel",
-            data=to_excel(df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']]),
-            file_name=f'maschinen_ohne_umsaetze_pareto_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        
+        # Top Produkte (nach Group)
+        if '2. Product Group' in df_products.columns:
+            st.markdown("---")
+            st.markdown("#### Top 10 Product Groups nach Umsatz")
+            
+            product_group_stats = df_products.groupby('2. Product Group').agg({
+                'VH-nr.': 'count',
+                'Umsätze YTD': 'sum',
+                'DB YTD': 'sum'
+            }).reset_index()
+            
+            product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
+            product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
+            product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(10)
+            
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                display_groups = product_group_stats.copy()
+                display_groups['Anzahl'] = display_groups['Anzahl'].apply(lambda x: f"{x:,}")
+                display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
+                display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
+                display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
+                st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
+            
+            with col2:
+                fig_groups = go.Figure()
+                
+                fig_groups.add_trace(go.Bar(
+                    y=product_group_stats['Product Group'],
+                    x=product_group_stats['Umsätze YTD'],
+                    orientation='h',
+                    marker_color='#3b82f6',
+                    text=product_group_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+                    textposition='outside'
+                ))
+                
+                fig_groups.update_layout(
+                    height=400,
+                    xaxis_title='Umsatz (€)',
+                    yaxis=dict(autorange='reversed'),
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig_groups, use_container_width=True)
+    else:
+        st.info("Keine Daten für Produktanalyse verfügbar. Bitte Filter anpassen.")
+
+# === MASCHINEN OHNE UMSÄTZE ===
