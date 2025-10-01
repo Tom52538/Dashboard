@@ -83,6 +83,18 @@ else:
 
 # Globaler YTD Filter in Sidebar
 st.sidebar.header("Globale Filter")
+
+# MASTER-FILTER: Steuert alle Sektionen
+st.sidebar.markdown("### 🎯 Master-Filter")
+st.sidebar.info("Dieser Filter gilt für ALLE Auswertungen auf der Seite")
+master_nl_filter = st.sidebar.selectbox(
+    "Niederlassung (alle Sektionen)", 
+    nl_options, 
+    key='master_nl'
+)
+
+st.sidebar.markdown("---")
+
 show_active = st.sidebar.checkbox("Nur Maschinen mit YTD-Aktivität", value=True)
 
 # Basis-Filterung
@@ -90,18 +102,18 @@ df_base = df.copy()
 if show_active:
     df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsätze YTD'] != 0)]
 
-st.sidebar.metric("Basis-Maschinen", f"{len(df_base):,}")
+# Master-Filter anwenden
+if master_nl_filter != 'Gesamt' and has_nl:
+    df_base = df_base[df_base['Niederlassung'] == master_nl_filter]
+
+st.sidebar.metric("Gefilterte Maschinen", f"{len(df_base):,}")
+st.sidebar.metric("Ausgewählte NL", master_nl_filter)
 
 # === ÜBERSICHT SEKTION ===
 st.header("Übersicht")
-col_filter, col_space = st.columns([1, 3])
-with col_filter:
-    nl_overview = st.selectbox("NL-Filter Übersicht", nl_options, key='nl_overview')
 
-# Übersicht Daten filtern
+# Übersicht Daten nutzen gefilterte Basis
 df_overview = df_base.copy()
-if nl_overview != 'Gesamt' and has_nl:
-    df_overview = df_overview[df_overview['Niederlassung'] == nl_overview]
 
 ytd_kosten = df_overview['Kosten YTD'].sum()
 ytd_umsaetze = df_overview['Umsätze YTD'].sum()
@@ -120,14 +132,9 @@ with col4:
 
 # === MONATLICHE ENTWICKLUNG ===
 st.header("Monatliche Entwicklung")
-col_filter2, col_space2 = st.columns([1, 3])
-with col_filter2:
-    nl_monthly = st.selectbox("NL-Filter Monatsdaten", nl_options, key='nl_monthly')
 
-# Monatliche Daten filtern
+# Monatliche Daten nutzen gefilterte Basis
 df_monthly_base = df_base.copy()
-if nl_monthly != 'Gesamt' and has_nl:
-    df_monthly_base = df_monthly_base[df_monthly_base['Niederlassung'] == nl_monthly]
 
 monthly_data = []
 for month in months:
@@ -207,13 +214,9 @@ st.plotly_chart(fig, use_container_width=True)
 
 # === TOP PERFORMER ===
 st.header("Top 10 Maschinen (YTD)")
-col_filter3, col_space3 = st.columns([1, 3])
-with col_filter3:
-    nl_top = st.selectbox("NL-Filter Top Performer", nl_options, key='nl_top')
 
+# Top Performer nutzen gefilterte Basis
 df_top = df_base.copy()
-if nl_top != 'Gesamt' and has_nl:
-    df_top = df_top[df_top['Niederlassung'] == nl_top]
 
 # Filtere nur relevante Maschinen (mindestens €1000 Umsatz)
 df_top_relevant = df_top[df_top['Umsätze YTD'] >= 1000]
@@ -289,13 +292,9 @@ with col2:
 
 # === WORST PERFORMER ===
 st.header("Worst 10 Maschinen (YTD)")
-col_filter4, col_space4 = st.columns([1, 3])
-with col_filter4:
-    nl_worst = st.selectbox("NL-Filter Worst Performer", nl_options, key='nl_worst')
 
+# Worst Performer nutzen gefilterte Basis
 df_worst = df_base.copy()
-if nl_worst != 'Gesamt' and has_nl:
-    df_worst = df_worst[df_worst['Niederlassung'] == nl_worst]
 
 # Filtere nur relevante Maschinen (mindestens €1000 Kosten)
 df_worst_relevant = df_worst[df_worst['Kosten YTD'] >= 1000]
@@ -371,13 +370,9 @@ with col2:
 
 # === MONATSTABELLE ===
 st.header("Detaillierte Monatsdaten")
-col_filter5, col_space5 = st.columns([1, 3])
-with col_filter5:
-    nl_table = st.selectbox("NL-Filter Monatstabelle", nl_options, key='nl_table')
 
+# Monatstabelle nutzt gefilterte Basis
 df_table_base = df_base.copy()
-if nl_table != 'Gesamt' and has_nl:
-    df_table_base = df_table_base[df_table_base['Niederlassung'] == nl_table]
 
 monthly_table = []
 for month in months:
@@ -488,6 +483,76 @@ with col4:
 st.download_button(
     label="📥 Export als CSV",
     data=df_table.to_csv(index=False).encode('utf-8'),
-    file_name=f'dashboard_export_{nl_table}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
+    file_name=f'dashboard_export_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
     mime='text/csv'
 )
+
+# === MASCHINEN OHNE UMSÄTZE ===
+st.header("⚠️ Maschinen ohne Umsätze (nur Kosten)")
+st.markdown("Diese Maschinen verursachen Kosten aber generieren keinen Umsatz")
+
+# Filtere Maschinen: Kosten > 0 UND Umsätze = 0
+df_no_revenue = df_base[(df_base['Kosten YTD'] > 0) & (df_base['Umsätze YTD'] == 0)].copy()
+
+# Sortiere nach höchsten Kosten (absteigend)
+df_no_revenue = df_no_revenue.sort_values('Kosten YTD', ascending=False)
+
+# Zeige Top 20 (oder alle, falls weniger)
+df_no_revenue_display = df_no_revenue.head(20)[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Status', 'Niederlassung']].copy()
+
+# Zusammenfassung
+col_sum1, col_sum2, col_sum3 = st.columns(3)
+with col_sum1:
+    st.metric("Anzahl Maschinen", len(df_no_revenue))
+with col_sum2:
+    st.metric("Gesamtkosten", f"€ {df_no_revenue['Kosten YTD'].sum():,.0f}")
+with col_sum3:
+    avg_cost = df_no_revenue['Kosten YTD'].mean() if len(df_no_revenue) > 0 else 0
+    st.metric("Ø Kosten pro Maschine", f"€ {avg_cost:,.0f}")
+
+st.markdown("#### Top 20 nach Kosten")
+
+col1, col2 = st.columns([1.5, 1])
+
+with col1:
+    # Tabelle
+    display_no_rev = df_no_revenue_display.copy()
+    display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
+    display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
+    st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=500)
+
+with col2:
+    # Chart: Kosten-Verteilung
+    if len(df_no_revenue_display) > 0:
+        fig_no_rev = go.Figure()
+        
+        y_labels_no_rev = df_no_revenue_display['VH-nr.'].astype(str) + ' | ' + df_no_revenue_display['Code'].astype(str)
+        
+        fig_no_rev.add_trace(go.Bar(
+            y=y_labels_no_rev,
+            x=df_no_revenue_display['Kosten YTD'],
+            orientation='h',
+            marker_color='#ef4444',
+            text=df_no_revenue_display['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+            textposition='outside'
+        ))
+        
+        fig_no_rev.update_layout(
+            height=500,
+            xaxis_title='Kosten (€)',
+            yaxis=dict(autorange='reversed'),
+            showlegend=False,
+            title="Kostenverteilung"
+        )
+        st.plotly_chart(fig_no_rev, use_container_width=True)
+    else:
+        st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
+
+# Export für diese Sektion
+if len(df_no_revenue) > 0:
+    st.download_button(
+        label="📥 Export Maschinen ohne Umsätze",
+        data=df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Status', 'Niederlassung']].to_csv(index=False).encode('utf-8'),
+        file_name=f'maschinen_ohne_umsaetze_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
+        mime='text/csv'
+    )
