@@ -785,7 +785,14 @@ if has_product_cols:
         # Top Produkte (nach Group)
         if '2. Product Group' in df_products.columns:
             st.markdown("---")
-            st.markdown("#### Top 10 Product Groups nach Umsatz")
+            st.markdown("#### Top 10 Product Groups")
+            
+            # Sortier-Option
+            sort_option = st.selectbox(
+                "Sortieren nach:",
+                ["Umsätze YTD", "DB YTD", "Marge %", "Anzahl"],
+                key='product_group_sort'
+            )
             
             product_group_stats = df_products.groupby('2. Product Group').agg({
                 'VH-nr.': 'count',
@@ -795,7 +802,15 @@ if has_product_cols:
             
             product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
             product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
-            product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(10)
+            
+            # Sortiere nach gewählter Option
+            sort_col_map = {
+                "Umsätze YTD": "Umsätze YTD",
+                "DB YTD": "DB YTD",
+                "Marge %": "Marge %",
+                "Anzahl": "Anzahl"
+            }
+            product_group_stats = product_group_stats.sort_values(sort_col_map[sort_option], ascending=False).head(10)
             
             col1, col2 = st.columns([1, 1])
             
@@ -805,7 +820,21 @@ if has_product_cols:
                 display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
                 display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
                 display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
-                st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
+                
+                # Verwende st.dataframe mit column_config für bessere Interaktivität
+                st.dataframe(
+                    display_groups, 
+                    use_container_width=True, 
+                    hide_index=True, 
+                    height=400,
+                    column_config={
+                        "Product Group": st.column_config.TextColumn("Product Group"),
+                        "Anzahl": st.column_config.TextColumn("Anzahl"),
+                        "Umsätze YTD": st.column_config.TextColumn("Umsätze YTD"),
+                        "DB YTD": st.column_config.TextColumn("DB YTD"),
+                        "Marge %": st.column_config.TextColumn("Marge %")
+                    }
+                )
             
             with col2:
                 fig_groups = go.Figure()
