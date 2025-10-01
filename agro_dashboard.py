@@ -497,20 +497,39 @@ df_no_revenue = df_base[(df_base['Kosten YTD'] > 0) & (df_base['Umsätze YTD'] =
 # Sortiere nach höchsten Kosten (absteigend)
 df_no_revenue = df_no_revenue.sort_values('Kosten YTD', ascending=False)
 
-# Zeige Top 20 (oder alle, falls weniger)
-df_no_revenue_display = df_no_revenue.head(20)[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Status', 'Niederlassung']].copy()
+# Berechne 80/20 Regel (Pareto-Prinzip)
+total_cost = df_no_revenue['Kosten YTD'].sum()
+target_cost = total_cost * 0.8  # 80% der Kosten
+
+# Finde die Maschinen die 80% der Kosten verursachen
+cumulative_cost = 0
+pareto_count = 0
+for idx, cost in enumerate(df_no_revenue['Kosten YTD']):
+    cumulative_cost += cost
+    pareto_count = idx + 1
+    if cumulative_cost >= target_cost:
+        break
+
+# Top Pareto-Maschinen (die 20% die 80% der Kosten verursachen)
+df_no_revenue_pareto = df_no_revenue.head(pareto_count)
+df_no_revenue_display = df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']].copy()
 
 # Zusammenfassung
-col_sum1, col_sum2, col_sum3 = st.columns(3)
+col_sum1, col_sum2, col_sum3, col_sum4 = st.columns(4)
 with col_sum1:
-    st.metric("Anzahl Maschinen", len(df_no_revenue))
+    st.metric("Gesamt Maschinen", len(df_no_revenue))
 with col_sum2:
-    st.metric("Gesamtkosten", f"€ {df_no_revenue['Kosten YTD'].sum():,.0f}")
+    st.metric("Gesamtkosten", f"€ {total_cost:,.0f}")
 with col_sum3:
-    avg_cost = df_no_revenue['Kosten YTD'].mean() if len(df_no_revenue) > 0 else 0
-    st.metric("Ø Kosten pro Maschine", f"€ {avg_cost:,.0f}")
+    pareto_percentage = (pareto_count / len(df_no_revenue) * 100) if len(df_no_revenue) > 0 else 0
+    st.metric("Top Maschinen (80/20)", f"{pareto_count} ({pareto_percentage:.0f}%)")
+with col_sum4:
+    pareto_cost = df_no_revenue_pareto['Kosten YTD'].sum()
+    pareto_cost_percentage = (pareto_cost / total_cost * 100) if total_cost > 0 else 0
+    st.metric("Deren Kosten", f"€ {pareto_cost:,.0f} ({pareto_cost_percentage:.0f}%)")
 
-st.markdown("#### Top 20 nach Kosten")
+st.markdown("#### Pareto-Analyse: Maschinen die 80% der Kosten verursachen")
+st.info(f"📊 **{pareto_count} Maschinen** ({pareto_percentage:.1f}% aller Maschinen ohne Umsätze) verursachen **€{pareto_cost:,.0f}** ({pareto_cost_percentage:.1f}% der Gesamtkosten)")
 
 col1, col2 = st.columns([1.5, 1])
 
@@ -542,17 +561,85 @@ with col2:
             xaxis_title='Kosten (€)',
             yaxis=dict(autorange='reversed'),
             showlegend=False,
-            title="Kostenverteilung"
+            title="Top Kostenverursacher (80/20 Regel)"
         )
         st.plotly_chart(fig_no_rev, use_container_width=True)
     else:
         st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
 
+# Pareto-Chart: Kumulative Kosten
+if len(df_no_revenue) > 0:
+    st.markdown("#### Pareto-Diagramm: Kumulative Kostenverteilung")
+    
+    # Berechne kumulative Kosten
+    df_cumulative = df_no_revenue.copy()
+    df_cumulative['Kumulative Kosten'] = df_cumulative['Kosten YTD'].cumsum()
+    df_cumulative['Kumulative %'] = (df_cumulative['Kumulative Kosten'] / total_cost * 100)
+    df_cumulative['Maschinen #'] = range(1, len(df_cumulative) + 1)
+    
+    fig_pareto = go.Figure()
+    
+    # Balken: Kosten
+    fig_pareto.add_trace(go.Bar(
+        x=df_cumulative['Maschinen #'],
+        y=df_cumulative['Kosten YTD'],
+        name='Kosten pro Maschine',
+        marker_color='#ef4444',
+        yaxis='y'
+    ))
+    
+    # Linie: Kumulative %
+    fig_pareto.add_trace(go.Scatter(
+        x=df_cumulative['Maschinen #'],
+        y=df_cumulative['Kumulative %'],
+        name='Kumulative Kosten %',
+        mode='lines+markers',
+        line=dict(color='#3b82f6', width=3),
+        yaxis='y2'
+    ))
+    
+    # 80% Linie
+    fig_pareto.add_hline(
+        y=80, 
+        line_dash="dash", 
+        line_color="green",
+        annotation_text="80% der Kosten",
+        annotation_position="right",
+        yref='y2'
+    )
+    
+    # Markiere Pareto-Punkt
+    fig_pareto.add_vline(
+        x=pareto_count,
+        line_dash="dash",
+        line_color="orange",
+        annotation_text=f"{pareto_count} Maschinen",
+        annotation_position="top"
+    )
+    
+    fig_pareto.update_layout(
+        height=400,
+        xaxis_title='Anzahl Maschinen (sortiert nach Kosten)',
+        yaxis=dict(title='Kosten (€)', side='left'),
+        yaxis2=dict(title='Kumulative Kosten (%)', side='right', overlaying='y', range=[0, 105]),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig_pareto, use_container_width=True)
+
 # Export für diese Sektion
 if len(df_no_revenue) > 0:
     st.download_button(
-        label="📥 Export Maschinen ohne Umsätze",
-        data=df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Status', 'Niederlassung']].to_csv(index=False).encode('utf-8'),
-        file_name=f'maschinen_ohne_umsaetze_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
+        label="📥 Export Alle Maschinen ohne Umsätze",
+        data=df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']].to_csv(index=False).encode('utf-8'),
+        file_name=f'maschinen_ohne_umsaetze_alle_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
+        mime='text/csv'
+    )
+    
+    st.download_button(
+        label="📥 Export Top Maschinen (80/20 Regel)",
+        data=df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']].to_csv(index=False).encode('utf-8'),
+        file_name=f'maschinen_ohne_umsaetze_pareto_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
         mime='text/csv'
     )
