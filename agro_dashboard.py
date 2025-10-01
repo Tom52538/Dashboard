@@ -5,7 +5,29 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
 import os
+from io import BytesIO
 
+# Funktion für Excel-Export
+def to_excel(df):
+    """Konvertiert DataFrame zu Excel-Bytes für Download"""
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Daten')
+        
+        # Worksheet formatieren
+        worksheet = writer.sheets['Daten']
+        
+        # Spaltenbreiten anpassen
+        for idx, col in enumerate(df.columns):
+            max_length = max(
+                df[col].astype(str).map(len).max(),
+                len(str(col))
+            )
+            worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
+    
+    return output.getvalue()
+
+# Page Config
 st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
 
 st.title("AGRO F66 Maschinen Dashboard")
@@ -480,12 +502,23 @@ with col4:
     st.metric("Gesamt DB (YTD)", f"€ {total_db:,.0f}", f"{(total_db/df_table['Umsaetze'].sum()*100):.1f}%")
 
 # EXPORT
-st.download_button(
-    label="📥 Export als CSV",
-    data=df_table.to_csv(index=False).encode('utf-8'),
-    file_name=f'dashboard_export_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
-    mime='text/csv'
-)
+col_exp1, col_exp2 = st.columns(2)
+
+with col_exp1:
+    st.download_button(
+        label="📥 Export als Excel",
+        data=to_excel(df_table),
+        file_name=f'dashboard_monatsdaten_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+with col_exp2:
+    st.download_button(
+        label="📄 Export als CSV",
+        data=df_table.to_csv(index=False).encode('utf-8'),
+        file_name=f'dashboard_monatsdaten_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
+        mime='text/csv'
+    )
 
 # === MASCHINEN OHNE UMSÄTZE ===
 st.header("⚠️ Maschinen ohne Umsätze (nur Kosten)")
@@ -541,18 +574,21 @@ with col1:
     st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=500)
 
 with col2:
-    # Chart: Kosten-Verteilung
+    # Chart: Kosten-Verteilung (Top 10 aus Pareto-Maschinen)
     if len(df_no_revenue_display) > 0:
+        # Zeige nur die Top 10 im Chart für bessere Lesbarkeit
+        df_chart_top10 = df_no_revenue_display.head(10)
+        
         fig_no_rev = go.Figure()
         
-        y_labels_no_rev = df_no_revenue_display['VH-nr.'].astype(str) + ' | ' + df_no_revenue_display['Code'].astype(str)
+        y_labels_no_rev = df_chart_top10['VH-nr.'].astype(str) + ' | ' + df_chart_top10['Code'].astype(str)
         
         fig_no_rev.add_trace(go.Bar(
             y=y_labels_no_rev,
-            x=df_no_revenue_display['Kosten YTD'],
+            x=df_chart_top10['Kosten YTD'],
             orientation='h',
             marker_color='#ef4444',
-            text=df_no_revenue_display['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+            text=df_chart_top10['Kosten YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
             textposition='outside'
         ))
         
@@ -561,85 +597,28 @@ with col2:
             xaxis_title='Kosten (€)',
             yaxis=dict(autorange='reversed'),
             showlegend=False,
-            title="Top Kostenverursacher (80/20 Regel)"
+            title=f"Top 10 Kostenverursacher"
         )
         st.plotly_chart(fig_no_rev, use_container_width=True)
     else:
         st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
 
-# Pareto-Chart: Kumulative Kosten
-if len(df_no_revenue) > 0:
-    st.markdown("#### Pareto-Diagramm: Kumulative Kostenverteilung")
-    
-    # Berechne kumulative Kosten
-    df_cumulative = df_no_revenue.copy()
-    df_cumulative['Kumulative Kosten'] = df_cumulative['Kosten YTD'].cumsum()
-    df_cumulative['Kumulative %'] = (df_cumulative['Kumulative Kosten'] / total_cost * 100)
-    df_cumulative['Maschinen #'] = range(1, len(df_cumulative) + 1)
-    
-    fig_pareto = go.Figure()
-    
-    # Balken: Kosten
-    fig_pareto.add_trace(go.Bar(
-        x=df_cumulative['Maschinen #'],
-        y=df_cumulative['Kosten YTD'],
-        name='Kosten pro Maschine',
-        marker_color='#ef4444',
-        yaxis='y'
-    ))
-    
-    # Linie: Kumulative %
-    fig_pareto.add_trace(go.Scatter(
-        x=df_cumulative['Maschinen #'],
-        y=df_cumulative['Kumulative %'],
-        name='Kumulative Kosten %',
-        mode='lines+markers',
-        line=dict(color='#3b82f6', width=3),
-        yaxis='y2'
-    ))
-    
-    # 80% Linie
-    fig_pareto.add_hline(
-        y=80, 
-        line_dash="dash", 
-        line_color="green",
-        annotation_text="80% der Kosten",
-        annotation_position="right",
-        yref='y2'
-    )
-    
-    # Markiere Pareto-Punkt
-    fig_pareto.add_vline(
-        x=pareto_count,
-        line_dash="dash",
-        line_color="orange",
-        annotation_text=f"{pareto_count} Maschinen",
-        annotation_position="top"
-    )
-    
-    fig_pareto.update_layout(
-        height=400,
-        xaxis_title='Anzahl Maschinen (sortiert nach Kosten)',
-        yaxis=dict(title='Kosten (€)', side='left'),
-        yaxis2=dict(title='Kumulative Kosten (%)', side='right', overlaying='y', range=[0, 105]),
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-        hovermode='x unified'
-    )
-    
-    st.plotly_chart(fig_pareto, use_container_width=True)
-
 # Export für diese Sektion
 if len(df_no_revenue) > 0:
-    st.download_button(
-        label="📥 Export Alle Maschinen ohne Umsätze",
-        data=df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']].to_csv(index=False).encode('utf-8'),
-        file_name=f'maschinen_ohne_umsaetze_alle_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
-        mime='text/csv'
-    )
+    col_exp1, col_exp2 = st.columns(2)
     
-    st.download_button(
-        label="📥 Export Top Maschinen (80/20 Regel)",
-        data=df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']].to_csv(index=False).encode('utf-8'),
-        file_name=f'maschinen_ohne_umsaetze_pareto_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.csv',
-        mime='text/csv'
-    )
+    with col_exp1:
+        st.download_button(
+            label="📥 Export Alle (Excel)",
+            data=to_excel(df_no_revenue[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']]),
+            file_name=f'maschinen_ohne_umsaetze_alle_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    
+    with col_exp2:
+        st.download_button(
+            label="📥 Export Top (80/20) Excel",
+            data=to_excel(df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']]),
+            file_name=f'maschinen_ohne_umsaetze_pareto_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
