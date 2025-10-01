@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 import os
 from io import BytesIO
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # Funktion für Excel-Export
 def to_excel(df):
@@ -26,6 +27,23 @@ def to_excel(df):
             worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
     
     return output.getvalue()
+
+def create_aggrid_table(df, height=400):
+    """Erstellt eine sortierbare AgGrid Tabelle"""
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_default_column(sortable=True, filterable=True, resizable=True)
+    gb.configure_side_bar()
+    gridOptions = gb.build()
+    
+    return AgGrid(
+        df,
+        gridOptions=gridOptions,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
+        fit_columns_on_grid_load=True,
+        theme='streamlit',
+        height=height,
+        allow_unsafe_jscode=True
+    )
 
 # Page Config
 st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
@@ -505,7 +523,7 @@ with col1:
         'Marge %': '{:.1f}%'
     }).applymap(highlight_marge, subset=['Marge %']).applymap(highlight_db, subset=['DB'])
     
-    st.dataframe(styled_table, use_container_width=True, height=400)
+    create_aggrid_table(styled_table.data, height=400)
     
     # Excel-Export-Button direkt unter der Tabelle
     st.download_button(
@@ -624,7 +642,7 @@ with col1:
     display_no_rev = df_no_revenue_display.copy()
     display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
     display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
-    st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=500)
+    create_aggrid_table(display_no_rev, height=500)
     
     # Excel-Export-Buttons direkt unter der Tabelle
     col_btn1, col_btn2 = st.columns(2)
@@ -772,7 +790,7 @@ if has_product_cols:
         display_products['DB YTD'] = display_products['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
         display_products['Marge %'] = display_products['Marge %'].apply(lambda x: f"{x:.1f}%")
         
-        st.dataframe(display_products, use_container_width=True, hide_index=True)
+        create_aggrid_table(display_products, height=400)
         
         # Export
         st.download_button(
@@ -810,7 +828,15 @@ if has_product_cols:
                 "Marge %": "Marge %",
                 "Anzahl": "Anzahl"
             }
-            product_group_stats = product_group_stats.sort_values(sort_col_map[sort_option], ascending=False).head(10)
+            
+            # Sortiere ABSTEIGEND (höchste Werte zuerst)
+            product_group_stats = product_group_stats.sort_values(
+                sort_col_map[sort_option], 
+                ascending=False
+            ).head(10)
+            
+            # Reset index damit die Sortierung korrekt angezeigt wird
+            product_group_stats = product_group_stats.reset_index(drop=True)
             
             col1, col2 = st.columns([1, 1])
             
@@ -821,20 +847,7 @@ if has_product_cols:
                 display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
                 display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
                 
-                # Verwende st.dataframe mit column_config für bessere Interaktivität
-                st.dataframe(
-                    display_groups, 
-                    use_container_width=True, 
-                    hide_index=True, 
-                    height=400,
-                    column_config={
-                        "Product Group": st.column_config.TextColumn("Product Group"),
-                        "Anzahl": st.column_config.TextColumn("Anzahl"),
-                        "Umsätze YTD": st.column_config.TextColumn("Umsätze YTD"),
-                        "DB YTD": st.column_config.TextColumn("DB YTD"),
-                        "Marge %": st.column_config.TextColumn("Marge %")
-                    }
-                )
+                create_aggrid_table(display_groups, height=400)
             
             with col2:
                 fig_groups = go.Figure()
