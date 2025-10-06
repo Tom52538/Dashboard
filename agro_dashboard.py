@@ -59,15 +59,15 @@ def login_page():
         st.markdown("---")
         
         with st.form("login_form"):
-            username = st.text_input("Benutzername", key="username")
-            password = st.text_input("Passwort", type="password", key="password")
+            username = st.text_input("Benutzername", key="login_username")
+            password = st.text_input("Passwort", type="password", key="login_password")
             submit = st.form_submit_button("Anmelden", use_container_width=True)
             
             if submit:
                 user_data = check_login(username, password)
                 if user_data:
                     st.session_state['logged_in'] = True
-                    st.session_state['username'] = username
+                    st.session_state['current_user'] = username
                     st.session_state['user_data'] = user_data
                     st.rerun()
                 else:
