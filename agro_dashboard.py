@@ -6,6 +6,99 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 import os
 from io import BytesIO
+import json
+import hashlib
+
+# ========================================
+# LOGIN-SYSTEM
+# ========================================
+
+def hash_password(password):
+    """Hasht ein Passwort mit SHA256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def load_users():
+    """Lädt Benutzer aus users.json"""
+    try:
+        with open('users.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        st.error("❌ users.json nicht gefunden! Bitte erstelle zuerst Benutzer mit create_users.py")
+        st.stop()
+
+def check_login(username, password):
+    """Prüft Login-Daten"""
+    users = load_users()
+    username = username.lower().strip()
+    
+    if username in users:
+        if users[username]['password'] == hash_password(password):
+            return users[username]
+    return None
+
+def login_page():
+    """Zeigt Login-Seite"""
+    st.set_page_config(page_title="AGRO F66 Login", layout="centered")
+    
+    # Styling
+    st.markdown("""
+        <style>
+        .login-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.title("🚜 AGRO F66")
+        st.subheader("Maschinen Dashboard")
+        st.markdown("---")
+        
+        with st.form("login_form"):
+            username = st.text_input("Benutzername", key="username")
+            password = st.text_input("Passwort", type="password", key="password")
+            submit = st.form_submit_button("Anmelden", use_container_width=True)
+            
+            if submit:
+                user_data = check_login(username, password)
+                if user_data:
+                    st.session_state['logged_in'] = True
+                    st.session_state['username'] = username
+                    st.session_state['user_data'] = user_data
+                    st.rerun()
+                else:
+                    st.error("❌ Ungültiger Benutzername oder Passwort")
+        
+        st.markdown("---")
+        st.caption("Bei Problemen wende dich an den Administrator")
+
+def logout():
+    """Logout-Funktion"""
+    st.session_state['logged_in'] = False
+    st.session_state['username'] = None
+    st.session_state['user_data'] = None
+    st.rerun()
+
+# Prüfe Login-Status
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+
+if not st.session_state['logged_in']:
+    login_page()
+    st.stop()
+
+# Ab hier: Benutzer ist eingeloggt
+user_data = st.session_state['user_data']
+is_admin = user_data['role'] == 'admin'
+user_niederlassung = user_data['niederlassung']
+
+# ========================================
+# DASHBOARD CODE
+# ========================================
 
 # Funktion für Excel-Export
 def to_excel(df):
@@ -30,20 +123,26 @@ def to_excel(df):
 # Page Config
 st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
 
-st.title("AGRO F66 Maschinen Dashboard")
+# Header mit Benutzerinfo und Logout
+col_header1, col_header2, col_header3 = st.columns([2, 1, 1])
+with col_header1:
+    st.title("AGRO F66 Maschinen Dashboard")
+with col_header2:
+    st.info(f"👤 **{user_data['name']}**")
+with col_header3:
+    if st.button("🚪 Logout", use_container_width=True):
+        logout()
 
-# Daten laden - OHNE File Upload!
-@st.cache_data(ttl=86400)  # Cache für 24 Stunden
+# Daten laden - JETZT MIT DEUTSCHER DATEI
+@st.cache_data(ttl=86400)
 def load_data():
-    """Lädt Dashboard_Master.xlsx direkt aus dem Repository"""
+    """Lädt Dashboard_Master_DE.xlsx direkt aus dem Repository"""
     try:
-        df = pd.read_excel("Dashboard_Master.xlsx", dtype={'VH-nr.': str})
+        df = pd.read_excel("Dashboard_Master_DE.xlsx", dtype={'VH-nr.': str})
         
-        # VH-Nr. als Text sicherstellen (falls trotzdem als Zahl gelesen)
         if 'VH-nr.' in df.columns:
             df['VH-nr.'] = df['VH-nr.'].astype(str).str.strip()
         
-        # Automatische Bereinigung: Runde alle numerischen Werte auf 2 Dezimalstellen
         kosten_spalten = [col for col in df.columns if 'Kosten' in col]
         umsatz_spalten = [col for col in df.columns if 'Umsätze' in col]
         db_spalten = [col for col in df.columns if 'DB' in col]
@@ -54,7 +153,7 @@ def load_data():
         
         return df
     except FileNotFoundError:
-        st.error("❌ Dashboard_Master.xlsx nicht gefunden! Bitte stelle sicher, dass die Datei im Repository liegt.")
+        st.error("❌ Dashboard_Master_DE.xlsx nicht gefunden!")
         st.stop()
     except Exception as e:
         st.error(f"❌ Fehler beim Laden der Daten: {e}")
@@ -62,10 +161,10 @@ def load_data():
 
 def get_file_info():
     """Zeigt Datei-Informationen"""
-    if os.path.exists("Dashboard_Master.xlsx"):
-        timestamp = os.path.getmtime("Dashboard_Master.xlsx")
+    if os.path.exists("Dashboard_Master_DE.xlsx"):
+        timestamp = os.path.getmtime("Dashboard_Master_DE.xlsx")
         last_update = datetime.fromtimestamp(timestamp).strftime("%d.%m.%Y %H:%M")
-        file_size = os.path.getsize("Dashboard_Master.xlsx") / (1024 * 1024)  # MB
+        file_size = os.path.getsize("Dashboard_Master_DE.xlsx") / (1024 * 1024)
         return last_update, file_size
     return "Unbekannt", 0
 
@@ -78,13 +177,11 @@ with col_info1:
 with col_info2:
     st.info(f"💾 **Dateigröße:** {file_size:.2f} MB")
 
-# Daten laden
 df = load_data()
 
 with col_info3:
     st.success(f"✅ **{len(df):,} Datensätze** geladen")
 
-# Cache-Clear Button (für manuelle Updates)
 if st.button("🔄 Daten neu laden"):
     st.cache_data.clear()
     st.rerun()
@@ -103,27 +200,31 @@ if has_nl:
 else:
     nl_options = ['Gesamt']
 
-# Globaler YTD Filter in Sidebar
-st.sidebar.header("Globale Filter")
+# ZUGRIFFSSTEUERUNG: Filter basierend auf Benutzerrolle
+st.sidebar.header("Filter")
 
-# MASTER-FILTER: Steuert alle Sektionen
-st.sidebar.markdown("### 🎯 Master-Filter")
-st.sidebar.info("Dieser Filter gilt für ALLE Auswertungen auf der Seite")
-master_nl_filter = st.sidebar.selectbox(
-    "Niederlassung (alle Sektionen)", 
-    nl_options, 
-    key='master_nl'
-)
+if is_admin:
+    # Admin sieht alle Niederlassungen
+    st.sidebar.success(f"🔓 **Admin-Zugriff**")
+    master_nl_filter = st.sidebar.selectbox(
+        "Niederlassung", 
+        nl_options, 
+        key='master_nl'
+    )
+else:
+    # NL-Leiter sieht nur seine Niederlassung
+    st.sidebar.warning(f"🔒 **Zugriff beschränkt auf:** {user_niederlassung}")
+    master_nl_filter = user_niederlassung
+    # Zeige die fixe Niederlassung an (nicht änderbar)
+    st.sidebar.info(f"**Niederlassung:** {user_niederlassung}")
 
 # PRODUKT-FILTER
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📦 Produkt-Filter")
 
-# Prüfe ob Produktspalten vorhanden sind
 has_product_cols = '1. Product Family' in df.columns
 
 if has_product_cols:
-    # Product Family Filter
     product_families = ['Alle'] + sorted([fam for fam in df['1. Product Family'].dropna().unique() if str(fam) != 'nan'])
     selected_family = st.sidebar.selectbox(
         "Product Family",
@@ -131,7 +232,6 @@ if has_product_cols:
         key='product_family'
     )
     
-    # Product Group Filter (abhängig von Family)
     if selected_family != 'Alle':
         df_filtered_for_group = df[df['1. Product Family'] == selected_family]
     else:
@@ -146,10 +246,8 @@ if has_product_cols:
 else:
     selected_family = 'Alle'
     selected_group = 'Alle'
-    st.sidebar.warning("Keine Produktinformationen verfügbar. Bitte Master-Datei mit Produktinfo erweitern.")
 
 st.sidebar.markdown("---")
-
 show_active = st.sidebar.checkbox("Nur Maschinen mit YTD-Aktivität", value=True)
 
 # Basis-Filterung
@@ -157,7 +255,7 @@ df_base = df.copy()
 if show_active:
     df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsätze YTD'] != 0)]
 
-# Master-Filter anwenden
+# Master-Filter anwenden (WICHTIG: Berücksichtigt Benutzerrechte)
 if master_nl_filter != 'Gesamt' and has_nl:
     df_base = df_base[df_base['Niederlassung'] == master_nl_filter]
 
@@ -177,7 +275,6 @@ if has_product_cols and selected_family != 'Alle':
 # === ÜBERSICHT SEKTION ===
 st.header("Übersicht")
 
-# Übersicht Daten nutzen gefilterte Basis
 df_overview = df_base.copy()
 
 ytd_kosten = df_overview['Kosten YTD'].sum()
@@ -198,7 +295,6 @@ with col4:
 # === MONATLICHE ENTWICKLUNG ===
 st.header("Monatliche Entwicklung")
 
-# Monatliche Daten nutzen gefilterte Basis
 df_monthly_base = df_base.copy()
 
 monthly_data = []
@@ -225,7 +321,6 @@ fig = make_subplots(
            [{"secondary_y": False}, {"secondary_y": False}]]
 )
 
-# Chart 1: Umsätze & Kosten
 fig.add_trace(go.Bar(name='Umsätze', x=df_monthly['Monat'], y=df_monthly['Umsaetze'], 
                      marker_color='#22c55e', text=df_monthly['Umsaetze'].apply(lambda x: f'€{x/1000:.0f}k'),
                      textposition='outside'), row=1, col=1)
@@ -233,33 +328,28 @@ fig.add_trace(go.Bar(name='Kosten', x=df_monthly['Monat'], y=df_monthly['Kosten'
                      marker_color='#ef4444', text=df_monthly['Kosten'].apply(lambda x: f'€{x/1000:.0f}k'),
                      textposition='outside'), row=1, col=1)
 
-# Chart 2: DB in Euro - mit dynamischer Y-Achse
 colors_db = ['#22c55e' if x >= 0 else '#ef4444' for x in df_monthly['DB']]
 fig.add_trace(go.Bar(name='DB (€)', x=df_monthly['Monat'], y=df_monthly['DB'], 
                      marker_color=colors_db, showlegend=False,
                      text=df_monthly['DB'].apply(lambda x: f'€{x/1000:.0f}k'),
                      textposition='outside'), row=1, col=2)
 
-# Dynamische Y-Achse für DB - berücksichtigt negative Werte
 min_db = df_monthly['DB'].min()
 max_db = df_monthly['DB'].max()
 y_range_db = [min_db * 1.2 if min_db < 0 else 0, max_db * 1.15]
 fig.update_yaxes(range=y_range_db, row=1, col=2)
 
-# Chart 3: Marge in % - mit dynamischer Y-Achse
 colors_marge = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in df_monthly['Marge %']]
 fig.add_trace(go.Bar(name='Marge %', x=df_monthly['Monat'], y=df_monthly['Marge %'], 
                      marker_color=colors_marge, showlegend=False,
                      text=df_monthly['Marge %'].apply(lambda x: f'{x:.1f}%'),
                      textposition='outside'), row=2, col=1)
 
-# Dynamische Y-Achse für Marge - berücksichtigt negative Werte
 min_marge = df_monthly['Marge %'].min()
 max_marge = df_monthly['Marge %'].max()
 y_range_marge = [min_marge * 1.2 if min_marge < 0 else 0, max_marge * 1.15]
 fig.update_yaxes(range=y_range_marge, row=2, col=1)
 
-# Chart 4: Kumulative Entwicklung
 df_monthly['Kum_Umsaetze'] = df_monthly['Umsaetze'].cumsum()
 df_monthly['Kum_DB'] = df_monthly['DB'].cumsum()
 fig.add_trace(go.Scatter(name='Kum. Umsätze', x=df_monthly['Monat'], y=df_monthly['Kum_Umsaetze'],
@@ -280,7 +370,6 @@ st.plotly_chart(fig, use_container_width=True)
 # === TOP PERFORMER ===
 st.header("Top 10 Maschinen (YTD)")
 
-# SORTIER-DROPDOWN - GROSS UND DEUTLICH
 st.markdown("### 🔽 Sortieren nach:")
 sort_top = st.selectbox(
     "Wähle Sortierung für Top 10:",
@@ -288,25 +377,19 @@ sort_top = st.selectbox(
     key='sort_top_10'
 )
 
-# Top Performer nutzen gefilterte Basis
 df_top = df_base.copy()
-
-# Filtere nur relevante Maschinen (mindestens €1000 Umsatz)
 df_top_relevant = df_top[df_top['Umsätze YTD'] >= 1000]
 
-# Sortiere nach gewählter Option
 if "DB YTD" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'DB YTD')
 elif "Umsätze YTD" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Umsätze YTD')
 elif "Marge YTD %" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Marge YTD %')
-else:  # Kosten
+else:
     top_10 = df_top_relevant.nlargest(10, 'Kosten YTD')
 
 top_10_display = top_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
-
-# Sortiere die Anzeige nach DB YTD absteigend (höchster DB zuerst)
 top_10_display = top_10_display.sort_values('DB YTD', ascending=False)
 
 st.markdown("#### Tabelle & Chart")
@@ -321,7 +404,6 @@ with col1:
     top_display['Marge YTD %'] = top_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
     st.dataframe(top_display, use_container_width=True, hide_index=True, height=400)
     
-    # Excel-Export-Button direkt unter der Tabelle
     st.download_button(
         label="📥 Export Top 10 (Excel)",
         data=to_excel(top_10_display),
@@ -331,10 +413,8 @@ with col1:
     )
 
 with col2:
-    # Gestapelter Balken: Kosten + DB = Umsatz
     fig_top = go.Figure()
     
-    # Y-Achsen Label: VH-Nr. + Code
     y_labels = top_10_display['VH-nr.'].astype(str) + ' | ' + top_10_display['Code'].astype(str)
     
     fig_top.add_trace(go.Bar(
@@ -357,7 +437,6 @@ with col2:
         textposition='inside'
     ))
     
-    # Marge als Text am Ende
     for idx, row in top_10_display.iterrows():
         y_label = str(row['VH-nr.']) + ' | ' + str(row['Code'])
         fig_top.add_annotation(
@@ -383,7 +462,6 @@ with col2:
 # === WORST PERFORMER ===
 st.header("Worst 10 Maschinen (YTD)")
 
-# SORTIER-DROPDOWN - GROSS UND DEUTLICH
 st.markdown("### 🔽 Sortieren nach:")
 sort_worst = st.selectbox(
     "Wähle Sortierung für Worst 10:",
@@ -391,25 +469,19 @@ sort_worst = st.selectbox(
     key='sort_worst_10'
 )
 
-# Worst Performer nutzen gefilterte Basis
 df_worst = df_base.copy()
-
-# Filtere nur relevante Maschinen (mindestens €1000 Kosten)
 df_worst_relevant = df_worst[df_worst['Kosten YTD'] >= 1000]
 
-# Sortiere nach gewählter Option
 if "DB YTD" in sort_worst:
     worst_10 = df_worst_relevant.nsmallest(10, 'DB YTD')
 elif "Marge YTD %" in sort_worst:
     worst_10 = df_worst_relevant.nsmallest(10, 'Marge YTD %')
 elif "Kosten YTD" in sort_worst:
     worst_10 = df_worst_relevant.nlargest(10, 'Kosten YTD')
-else:  # Umsätze
+else:
     worst_10 = df_worst_relevant.nsmallest(10, 'Umsätze YTD')
 
 worst_10_display = worst_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
-
-# Sortiere die Anzeige nach DB YTD aufsteigend (niedrigster DB zuerst)
 worst_10_display = worst_10_display.sort_values('DB YTD', ascending=True)
 
 st.markdown("#### Tabelle & Chart")
@@ -424,7 +496,6 @@ with col1:
     worst_display['Marge YTD %'] = worst_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
     st.dataframe(worst_display, use_container_width=True, hide_index=True, height=400)
     
-    # Excel-Export-Button direkt unter der Tabelle
     st.download_button(
         label="📥 Export Worst 10 (Excel)",
         data=to_excel(worst_10_display),
@@ -434,10 +505,8 @@ with col1:
     )
 
 with col2:
-    # Gestapelter Balken: Kosten + DB = Umsatz
     fig_worst = go.Figure()
     
-    # Y-Achsen Label: VH-Nr. + Code
     y_labels_worst = worst_10_display['VH-nr.'].astype(str) + ' | ' + worst_10_display['Code'].astype(str)
     
     fig_worst.add_trace(go.Bar(
@@ -460,7 +529,6 @@ with col2:
         textposition='inside'
     ))
     
-    # Marge als Text
     for idx, row in worst_10_display.iterrows():
         y_label = str(row['VH-nr.']) + ' | ' + str(row['Code'])
         fig_worst.add_annotation(
@@ -486,7 +554,6 @@ with col2:
 # === MONATSTABELLE ===
 st.header("Detaillierte Monatsdaten")
 
-# Monatstabelle nutzt gefilterte Basis
 df_table_base = df_base.copy()
 
 monthly_table = []
@@ -505,11 +572,9 @@ for month in months:
 df_table = pd.DataFrame(monthly_table)
 df_table['Marge %'] = (df_table['DB'] / df_table['Umsaetze'] * 100).fillna(0)
 
-# Moderne Visualisierung statt einfacher Tabelle
 col1, col2 = st.columns(2)
 
 with col1:
-    # Heatmap-Style Tabelle mit Farbcodierung
     def highlight_marge(val):
         if isinstance(val, str) and '%' in val:
             num = float(val.replace('%', '').replace(',', '.'))
@@ -539,7 +604,6 @@ with col1:
     
     st.dataframe(styled_table, use_container_width=True, height=400)
     
-    # Excel-Export-Button direkt unter der Tabelle
     st.download_button(
         label="📥 Export Monatsdaten (Excel)",
         data=to_excel(df_table),
@@ -549,14 +613,12 @@ with col1:
     )
 
 with col2:
-    # Sparkline-Charts für jeden Monat
     fig_mini = make_subplots(
         rows=2, cols=1,
         subplot_titles=('Monatliche Marge %', 'DB-Entwicklung (€)'),
         row_heights=[0.5, 0.5]
     )
     
-    # Marge Trend
     colors_trend = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in df_table['Marge %']]
     fig_mini.add_trace(go.Bar(
         x=df_table['Monat'],
@@ -567,7 +629,6 @@ with col2:
         showlegend=False
     ), row=1, col=1)
     
-    # DB Trend
     fig_mini.add_trace(go.Scatter(
         x=df_table['Monat'],
         y=df_table['DB'],
@@ -585,7 +646,6 @@ with col2:
     
     st.plotly_chart(fig_mini, use_container_width=True)
 
-# Zusätzliche Insights
 st.markdown("### Monatliche Insights")
 col1, col2, col3, col4 = st.columns(4)
 
@@ -607,17 +667,12 @@ with col4:
 st.header("⚠️ Maschinen ohne Umsätze (nur Kosten)")
 st.markdown("Diese Maschinen verursachen Kosten aber generieren keinen Umsatz")
 
-# Filtere Maschinen: Kosten > 0 UND Umsätze = 0
 df_no_revenue = df_base[(df_base['Kosten YTD'] > 0) & (df_base['Umsätze YTD'] == 0)].copy()
-
-# Sortiere nach höchsten Kosten (absteigend)
 df_no_revenue = df_no_revenue.sort_values('Kosten YTD', ascending=False)
 
-# Berechne 80/20 Regel (Pareto-Prinzip)
 total_cost = df_no_revenue['Kosten YTD'].sum()
-target_cost = total_cost * 0.8  # 80% der Kosten
+target_cost = total_cost * 0.8
 
-# Finde die Maschinen die 80% der Kosten verursachen
 cumulative_cost = 0
 pareto_count = 0
 for idx, cost in enumerate(df_no_revenue['Kosten YTD']):
@@ -626,11 +681,9 @@ for idx, cost in enumerate(df_no_revenue['Kosten YTD']):
     if cumulative_cost >= target_cost:
         break
 
-# Top Pareto-Maschinen (die 20% die 80% der Kosten verursachen)
 df_no_revenue_pareto = df_no_revenue.head(pareto_count)
 df_no_revenue_display = df_no_revenue_pareto[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Niederlassung']].copy()
 
-# Zusammenfassung
 col_sum1, col_sum2, col_sum3, col_sum4 = st.columns(4)
 with col_sum1:
     st.metric("Gesamt Maschinen", len(df_no_revenue))
@@ -650,13 +703,11 @@ st.info(f"📊 **{pareto_count} Maschinen** ({pareto_percentage:.1f}% aller Masc
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
-    # Tabelle
     display_no_rev = df_no_revenue_display.copy()
     display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
     display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
     st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=500)
     
-    # Excel-Export-Buttons direkt unter der Tabelle
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         st.download_button(
@@ -676,9 +727,7 @@ with col1:
         )
 
 with col2:
-    # Chart: Kosten-Verteilung (Top 10 aus Pareto-Maschinen)
     if len(df_no_revenue_display) > 0:
-        # Zeige nur die Top 10 im Chart für bessere Lesbarkeit
         df_chart_top10 = df_no_revenue_display.head(10)
         
         fig_no_rev = go.Figure()
@@ -709,12 +758,10 @@ with col2:
 if has_product_cols:
     st.header("📦 Produktanalyse")
     
-    # Check ob gefilterte Daten verfügbar sind
     df_products = df_base.copy()
     
     if len(df_products) > 0 and '1. Product Family' in df_products.columns:
         
-        # Aggregiere nach Product Family
         product_family_stats = df_products.groupby('1. Product Family').agg({
             'VH-nr.': 'count',
             'Kosten YTD': 'sum',
@@ -725,7 +772,6 @@ if has_product_cols:
         product_family_stats.columns = ['Product Family', 'Anzahl', 'Kosten YTD', 'Umsätze YTD', 'DB YTD']
         product_family_stats['Marge %'] = (product_family_stats['DB YTD'] / product_family_stats['Umsätze YTD'] * 100).fillna(0)
         
-        # Metrics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Produkt-Kategorien", len(product_family_stats))
@@ -737,13 +783,11 @@ if has_product_cols:
             avg_marge = (product_family_stats['DB YTD'].sum() / product_family_stats['Umsätze YTD'].sum() * 100) if product_family_stats['Umsätze YTD'].sum() > 0 else 0
             st.metric("Ø Marge", f"{avg_marge:.1f}%")
         
-        # Charts
         col_left, col_right = st.columns(2)
         
         with col_left:
             st.markdown("#### Umsatz nach Product Family")
             
-            # Sortiere für Chart nach Umsatz
             product_family_chart = product_family_stats.sort_values('Umsätze YTD', ascending=False)
             
             fig_family = go.Figure()
@@ -770,7 +814,6 @@ if has_product_cols:
         with col_right:
             st.markdown("#### Marge % nach Product Family")
             
-            # Sortiere für Chart nach Marge
             product_family_marge_chart = product_family_stats.sort_values('Marge %', ascending=False)
             
             colors_marge = ['#22c55e' if x >= 20 else '#f59e0b' if x >= 10 else '#ef4444' for x in product_family_marge_chart['Marge %']]
@@ -795,10 +838,8 @@ if has_product_cols:
             
             st.plotly_chart(fig_marge, use_container_width=True)
         
-        # Product Mix Tabelle
         st.markdown("#### Produkt-Mix Übersicht")
         
-        # SORTIER-DROPDOWN - GROSS UND DEUTLICH
         st.markdown("### 🔽 Sortieren nach:")
         sort_product_mix = st.selectbox(
             "Wähle Sortierung für Produkt-Mix:",
@@ -806,7 +847,6 @@ if has_product_cols:
             key='sort_product_mix'
         )
         
-        # Sortiere nach gewählter Option
         if "Umsätze YTD" in sort_product_mix:
             product_family_stats = product_family_stats.sort_values('Umsätze YTD', ascending=False)
         elif "DB YTD" in sort_product_mix:
@@ -815,7 +855,7 @@ if has_product_cols:
             product_family_stats = product_family_stats.sort_values('Marge %', ascending=False)
         elif "Anzahl" in sort_product_mix:
             product_family_stats = product_family_stats.sort_values('Anzahl', ascending=False)
-        else:  # Kosten YTD
+        else:
             product_family_stats = product_family_stats.sort_values('Kosten YTD', ascending=False)
         
         display_products = product_family_stats.copy()
@@ -827,7 +867,6 @@ if has_product_cols:
         
         st.dataframe(display_products, use_container_width=True, hide_index=True)
         
-        # Export
         st.download_button(
             label="📥 Export Produktanalyse (Excel)",
             data=to_excel(product_family_stats),
@@ -835,12 +874,10 @@ if has_product_cols:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
-        # Top Produkte (nach Group)
         if '2. Product Group' in df_products.columns:
             st.markdown("---")
             st.markdown("#### Top 20 Product Groups")
             
-            # SORTIER-DROPDOWN - GROSS UND DEUTLICH
             st.markdown("### 🔽 Sortieren nach:")
             sort_groups = st.selectbox(
                 "Wähle Sortierung für Product Groups:",
@@ -857,14 +894,13 @@ if has_product_cols:
             product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
             product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
             
-            # Sortiere nach gewählter Option
             if "Umsätze YTD" in sort_groups:
                 product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
             elif "DB YTD" in sort_groups:
                 product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
             elif "Marge %" in sort_groups:
                 product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
-            else:  # Anzahl
+            else:
                 product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
             
             col1, col2 = st.columns([1, 1])
