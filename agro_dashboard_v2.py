@@ -373,7 +373,7 @@ with col_send:
                 Filter: {master_nl_filter}
                 """
                 
-                response = ask_gemini(user_question, df_base)
+                response = ask_gemini(user_question, df)
                 
                 response = response
                 
@@ -1116,3 +1116,4 @@ if has_product_cols:
                 st.plotly_chart(fig_groups, use_container_width=True)
     else:
         st.info("Keine Daten für Produktanalyse verfügbar. Bitte Filter anpassen.")
+
