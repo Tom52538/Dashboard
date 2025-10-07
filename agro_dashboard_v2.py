@@ -14,6 +14,74 @@ import csv
 # SICHERHEITS-FUNKTIONEN
 # ========================================
 
+
+
+def ask_gemini(question, df):
+    """
+    Sendet Frage mit DataFrame-Kontext an Gemini API
+    
+    Args:
+        question: Die Frage des Users
+        df: Der pandas DataFrame mit den Daten
+    
+    Returns:
+        str: Antwort von Gemini oder Fehlermeldung
+    """
+    try:
+        # Gemini Modell initialisieren
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Kontext aus DataFrame erstellen
+        context = f"""
+Datenstruktur der Agro F66 Datenbank:
+- Anzahl Maschinen/Zeilen: {len(df)}
+- Verfügbare Spalten: {', '.join(df.columns.tolist())}
+
+Verfügbare Product Families und ihre Häufigkeit:
+{df['Product Family'].value_counts().to_string()}
+
+Wichtige Statistiken:
+- Gesamtumsatz YTD: {df['Umsätze YTD'].sum():,.2f} €
+- Gesamt DB YTD: {df['DB YTD'].sum():,.2f} €
+- Durchschnittlicher Umsatz pro Maschine: {df['Umsätze YTD'].mean():,.2f} €
+- Durchschnittlicher DB pro Maschine: {df['DB YTD'].mean():,.2f} €
+- Durchschnittliche Marge: {(df['DB YTD'].sum() / df['Umsätze YTD'].sum() * 100):.1f}%
+
+Product Family mit niedrigstem DB:
+{df.groupby('Product Family')['DB YTD'].sum().sort_values().head(3).to_string()}
+
+Beispiel-Daten (erste 5 Zeilen):
+{df.head(5)[['Product Family', 'Product Group', 'Umsätze YTD', 'DB YTD', 'Marge %']].to_string()}
+"""
+        
+        # Prompt für Gemini erstellen
+        prompt = f"""Du bist ein intelligenter Datenanalyse-Assistent für das Agro F66 Maschinenpark-Dashboard.
+
+KONTEXT (Aktuelle Daten):
+{context}
+
+FRAGE DES USERS:
+{question}
+
+ANWEISUNGEN:
+- Antworte präzise und auf Deutsch
+- Nutze die Daten aus dem Kontext
+- Bei Fragen nach "niedrigsten" Werten: Schaue auf DB YTD oder Umsätze YTD
+- Nenne konkrete Zahlen aus den Daten
+- Sei freundlich und hilfreich
+- Wenn Daten fehlen, sage das ehrlich
+
+DEINE ANTWORT:"""
+        
+        # Anfrage an Gemini senden
+        response = model.generate_content(prompt)
+        
+        return response.text
+        
+    except Exception as e:
+        return f"❌ Fehler bei der Gemini API Anfrage: {str(e)}\n\nBitte prüfe:\n- Ist der GEMINI_API_KEY korrekt in Streamlit Secrets?\n- Ist die Gemini API aktiviert?"
+
+
 def log_download(user, filename, niederlassung, num_rows):
     """Protokolliert jeden Download für Audit"""
     log_file = 'download_log.csv'
