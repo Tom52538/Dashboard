@@ -753,71 +753,68 @@ with col_sum4:
     pareto_cost = df_no_revenue_pareto['Kosten YTD'].sum()
     pareto_cost_percentage = (pareto_cost / total_cost * 100) if total_cost > 0 else 0
     st.metric("Deren Kosten", f"€ {pareto_cost:,.0f} ({pareto_cost_percentage:.0f}%)")
-        """
-DIESER CODE FEHLT AM ENDE DER PRODUKTANALYSE!
-Füge das NACH Zeile 836 ein (nach dem Export-Button)
-"""
+        
 
-        # Top Produkte (nach Group)
-        if '2. Product Group' in df_products.columns:
-            st.markdown("---")
-            st.markdown("#### Top 20 Product Groups")
+    # Top Produkte (nach Group)
+    if '2. Product Group' in df_products.columns:
+        st.markdown("---")
+        st.markdown("#### Top 20 Product Groups")
             
-            st.markdown("### 🔽 Sortieren nach:")
-            sort_groups = st.selectbox(
-                "Wähle Sortierung für Product Groups:",
-                ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
-                key='sort_product_groups'
+        st.markdown("### 🔽 Sortieren nach:")
+        sort_groups = st.selectbox(
+            "Wähle Sortierung für Product Groups:",
+            ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
+            key='sort_product_groups'
+        )
+            
+        product_group_stats = df_products.groupby('2. Product Group').agg({
+            'VH-nr.': 'count',
+            'Umsätze YTD': 'sum',
+            'DB YTD': 'sum'
+        }).reset_index()
+            
+        product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
+        product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
+            
+        if "Umsätze YTD" in sort_groups:
+            product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
+        elif "DB YTD" in sort_groups:
+            product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
+        elif "Marge %" in sort_groups:
+            product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
+        else:
+            product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
+            
+        col1, col2 = st.columns([1, 1])
+            
+        with col1:
+            display_groups = product_group_stats.copy()
+            display_groups['Anzahl'] = display_groups['Anzahl'].apply(lambda x: f"{x:,}")
+            display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
+            display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
+            display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
+                
+            st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
+            
+        with col2:
+            fig_groups = go.Figure()
+                
+            fig_groups.add_trace(go.Bar(
+                y=product_group_stats['Product Group'],
+                x=product_group_stats['Umsätze YTD'],
+                orientation='h',
+                marker_color='#3b82f6',
+                text=product_group_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+                textposition='outside'
+            ))
+                
+            fig_groups.update_layout(
+                height=400,
+                xaxis_title='Umsatz (€)',
+                yaxis=dict(autorange='reversed'),
+                showlegend=False
             )
-            
-            product_group_stats = df_products.groupby('2. Product Group').agg({
-                'VH-nr.': 'count',
-                'Umsätze YTD': 'sum',
-                'DB YTD': 'sum'
-            }).reset_index()
-            
-            product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
-            product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
-            
-            if "Umsätze YTD" in sort_groups:
-                product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
-            elif "DB YTD" in sort_groups:
-                product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
-            elif "Marge %" in sort_groups:
-                product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
-            else:
-                product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
-            
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                display_groups = product_group_stats.copy()
-                display_groups['Anzahl'] = display_groups['Anzahl'].apply(lambda x: f"{x:,}")
-                display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
-                display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
-                display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
                 
-                st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
-            
-            with col2:
-                fig_groups = go.Figure()
-                
-                fig_groups.add_trace(go.Bar(
-                    y=product_group_stats['Product Group'],
-                    x=product_group_stats['Umsätze YTD'],
-                    orientation='h',
-                    marker_color='#3b82f6',
-                    text=product_group_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
-                    textposition='outside'
-                ))
-                
-                fig_groups.update_layout(
-                    height=400,
-                    xaxis_title='Umsatz (€)',
-                    yaxis=dict(autorange='reversed'),
-                    showlegend=False
-                )
-                
-                st.plotly_chart(fig_groups, use_container_width=True)
+            st.plotly_chart(fig_groups, use_container_width=True)
     else:
-        st.info("Keine Daten für Produktanalyse verfügbar. Bitte Filter anpassen.")
+    st.info("Keine Daten für Produktanalyse verfügbar. Bitte Filter anpassen.")
