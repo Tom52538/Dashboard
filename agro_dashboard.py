@@ -79,7 +79,7 @@ def login_page():
 def logout():
     """Logout-Funktion"""
     st.session_state['logged_in'] = False
-    st.session_state['username'] = None
+    st.session_state['current_user'] = None
     st.session_state['user_data'] = None
     st.rerun()
 
@@ -133,8 +133,8 @@ with col_header3:
     if st.button("🚪 Logout", use_container_width=True):
         logout()
 
-# Daten laden - JETZT MIT DEUTSCHER DATEI
-@st.cache_data(ttl=86400)
+# Daten laden - MIT AUTOMATISCHER CACHE-INVALIDIERUNG
+@st.cache_data(ttl=3600)
 def load_data():
     """Lädt Dashboard_Master_DE.xlsx direkt aus dem Repository"""
     try:
@@ -160,11 +160,22 @@ def load_data():
         st.stop()
 
 def get_file_info():
-    """Zeigt Datei-Informationen"""
+    """Zeigt Datei-Informationen und prüft ob Datei aktualisiert wurde"""
     if os.path.exists("Dashboard_Master_DE.xlsx"):
         timestamp = os.path.getmtime("Dashboard_Master_DE.xlsx")
         last_update = datetime.fromtimestamp(timestamp).strftime("%d.%m.%Y %H:%M")
         file_size = os.path.getsize("Dashboard_Master_DE.xlsx") / (1024 * 1024)
+        
+        # Prüfe ob Datei sich geändert hat und lösche Cache automatisch
+        cache_key = 'file_timestamp'
+        if cache_key not in st.session_state:
+            st.session_state[cache_key] = timestamp
+        elif st.session_state[cache_key] != timestamp:
+            # Datei wurde aktualisiert - Cache löschen
+            st.cache_data.clear()
+            st.session_state[cache_key] = timestamp
+            st.rerun()
+        
         return last_update, file_size
     return "Unbekannt", 0
 
