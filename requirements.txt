@@ -3,4 +3,4 @@ pandas==2.2.3
 plotly==5.24.1
 openpyxl==3.1.5
 streamlit-aggrid
-anthropic==0.39.0
+google-generativeai==0.3.2
