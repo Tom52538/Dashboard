@@ -259,7 +259,90 @@ else:
     nl_options = ['Gesamt']
 
 # SIDEBAR: Filter + Chat
-st.sidebar.header("Filter")
+st.sidebar.header("⚙️ Filter")
+
+# === CHAT GANZ OBEN ===
+st.sidebar.markdown("### 💬 Frag deine Daten")
+st.sidebar.caption("Powered by Claude AI")
+
+if 'chat_messages' not in st.session_state:
+    st.session_state['chat_messages'] = []
+
+if len(st.session_state['chat_messages']) == 0:
+    st.sidebar.info("👋 Stell mir eine Frage!")
+    st.sidebar.markdown("**Beispiele:**")
+    st.sidebar.markdown("• Top 5 Maschinen?")
+    st.sidebar.markdown("• Verluste in Leipzig?")
+    st.sidebar.markdown("• Marge-Trend?")
+else:
+    for msg in st.session_state['chat_messages'][-3:]:
+        if msg['role'] == 'user':
+            st.sidebar.markdown(f"**Du:** {msg['content']}")
+        else:
+            st.sidebar.markdown(f"🤖 {msg['content']}")
+
+user_question = st.sidebar.text_input("Deine Frage:", key="chat_input", placeholder="z.B. Welche Maschine läuft am besten?")
+
+col_send, col_clear = st.sidebar.columns([3, 1])
+
+with col_send:
+    if st.button("📤", use_container_width=True, disabled=not user_question):
+        if user_question:
+            st.session_state['chat_messages'].append({
+                'role': 'user',
+                'content': user_question
+            })
+            
+            # Claude API Call
+            try:
+                import anthropic
+                
+                client = anthropic.Anthropic(
+                    api_key=st.secrets["ANTHROPIC_API_KEY"]
+                )
+                
+                # Daten-Kontext (anonymisiert)
+                data_summary = f"""
+                Datensatz: {len(df_base)} Maschinen
+                YTD Umsätze: €{ytd_umsaetze:,.0f}
+                YTD DB: €{ytd_db:,.0f}
+                YTD Marge: {ytd_marge:.1f}%
+                Filter: {master_nl_filter}
+                """
+                
+                message = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=500,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Du bist ein Dashboard-Analyst. Kontext:\n{data_summary}\n\nFrage: {user_question}"
+                        }
+                    ]
+                )
+                
+                response = message.content[0].text
+                
+            except Exception as e:
+                response = f"❌ Fehler: {str(e)}"
+            
+            st.session_state['chat_messages'].append({
+                'role': 'assistant',
+                'content': response
+            })
+            
+            st.rerun()
+
+with col_clear:
+    if st.button("🗑️", use_container_width=True, help="Chat löschen"):
+        st.session_state['chat_messages'] = []
+        st.rerun()
+
+st.sidebar.caption("🔒 Chat-Daten werden nicht gespeichert")
+
+st.sidebar.markdown("---")
+
+# === FILTER ===
 
 if is_admin:
     st.sidebar.success(f"🔓 **Admin-Zugriff**")
@@ -314,54 +397,7 @@ st.sidebar.metric("Ausgewählte NL", master_nl_filter)
 if has_product_cols and selected_family != 'Alle':
     st.sidebar.metric("Produkt-Filter", f"{selected_family}")
 
-# CHAT BEREICH in Sidebar
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 💬 Frag deine Daten")
-st.sidebar.caption("Powered by Claude AI")
 
-if 'chat_messages' not in st.session_state:
-    st.session_state['chat_messages'] = []
-
-if len(st.session_state['chat_messages']) == 0:
-    st.sidebar.info("👋 Stell mir eine Frage!")
-    st.sidebar.markdown("**Beispiele:**")
-    st.sidebar.markdown("• Top 5 Maschinen?")
-    st.sidebar.markdown("• Verluste in Leipzig?")
-    st.sidebar.markdown("• Marge-Trend?")
-else:
-    for msg in st.session_state['chat_messages'][-3:]:
-        if msg['role'] == 'user':
-            st.sidebar.markdown(f"**Du:** {msg['content']}")
-        else:
-            st.sidebar.markdown(f"🤖 {msg['content']}")
-
-user_question = st.sidebar.text_input("Deine Frage:", key="chat_input", placeholder="z.B. Welche Maschine läuft am besten?")
-
-col_send, col_clear = st.sidebar.columns([3, 1])
-
-with col_send:
-    if st.button("📤", use_container_width=True, disabled=not user_question):
-        if user_question:
-            st.session_state['chat_messages'].append({
-                'role': 'user',
-                'content': user_question
-            })
-            
-            response = f"Ich analysiere deine Frage: '{user_question}'. Diese Funktion wird in Kürze aktiviert."
-            
-            st.session_state['chat_messages'].append({
-                'role': 'assistant',
-                'content': response
-            })
-            
-            st.rerun()
-
-with col_clear:
-    if st.button("🗑️", use_container_width=True, help="Chat löschen"):
-        st.session_state['chat_messages'] = []
-        st.rerun()
-
-st.sidebar.caption("🔒 Chat-Daten werden nicht gespeichert")
 # === ÜBERSICHT SEKTION ===
 st.header("Übersicht")
 
