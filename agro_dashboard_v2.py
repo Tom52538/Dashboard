@@ -218,136 +218,78 @@ def get_file_info():
         return last_update, file_size
     return "Unbekannt", 0
 
-# Layout: Main Content + Chat Sidebar
-col_main, col_chat = st.columns([3, 1])
+# Info-Banner
+last_update, file_size = get_file_info()
+col_info1, col_info2, col_info3 = st.columns(3)
+
+with col_info1:
+    st.info(f"📅 **Update:** {last_update}")
+with col_info2:
+    st.info(f"💾 **Größe:** {file_size:.2f} MB")
+
+df = load_data()
+
+with col_info3:
+    st.success(f"✅ **{len(df):,} Datensätze**")
+
+if st.button("🔄 Neu laden"):
+    st.cache_data.clear()
+    st.rerun()
+
+st.markdown("---")
+
+# Monate extrahieren
+cost_cols = [col for col in df.columns if col.startswith('Kosten ') and 'YTD' not in col]
+months = [col.replace('Kosten ', '') for col in cost_cols]
+
+# Niederlassungs-Optionen
+has_nl = 'Niederlassung' in df.columns
+
+if has_nl:
+    nl_options = ['Gesamt'] + sorted([nl for nl in df['Niederlassung'].unique() if nl != 'Unbekannt'])
+else:
+    nl_options = ['Gesamt']
 
 # ========================================
-# CHAT SIDEBAR (RECHTS)
+# SIDEBAR: Filter + Chat
 # ========================================
 
-with col_chat:
-    st.markdown("### 💬 Frag deine Daten")
-    st.caption("Powered by Claude AI")
+with st.sidebar:
+    st.header("⚙️ Filter")
     
-    if 'chat_messages' not in st.session_state:
-        st.session_state['chat_messages'] = []
-    
-    chat_container = st.container(height=400)
-    
-    with chat_container:
-        if len(st.session_state['chat_messages']) == 0:
-            st.info("👋 Stell mir eine Frage zu deinen Daten!")
-            st.markdown("**Beispiele:**")
-            st.markdown("- Top 5 Maschinen?")
-            st.markdown("- Verluste in Leipzig?")
-            st.markdown("- Marge-Trend?")
-        else:
-            for msg in st.session_state['chat_messages']:
-                if msg['role'] == 'user':
-                    st.markdown(f"**Du:** {msg['content']}")
-                else:
-                    st.markdown(f"🤖 **Claude:** {msg['content']}")
-    
-    user_question = st.text_input("Deine Frage:", key="chat_input", placeholder="z.B. Welche Maschine läuft am besten?")
-    
-    col_send, col_clear = st.columns([3, 1])
-    
-    with col_send:
-        if st.button("📤 Senden", use_container_width=True, disabled=not user_question):
-            if user_question:
-                st.session_state['chat_messages'].append({
-                    'role': 'user',
-                    'content': user_question
-                })
-                
-                response = f"Ich analysiere deine Frage: '{user_question}'. Diese Funktion wird in Kürze aktiviert."
-                
-                st.session_state['chat_messages'].append({
-                    'role': 'assistant',
-                    'content': response
-                })
-                
-                st.rerun()
-    
-    with col_clear:
-        if st.button("🗑️", use_container_width=True, help="Chat löschen"):
-            st.session_state['chat_messages'] = []
-            st.rerun()
-    
-    st.markdown("---")
-    st.caption("🔒 Chat-Daten werden nicht gespeichert")
-    st.caption("📊 Nur aggregierte Daten, keine Details")
-
-# ========================================
-# MAIN DASHBOARD CONTENT
-# ========================================
-
-with col_main:
-    # Info-Banner
-    last_update, file_size = get_file_info()
-    col_info1, col_info2, col_info3 = st.columns(3)
-    
-    with col_info1:
-        st.info(f"📅 **Update:** {last_update}")
-    with col_info2:
-        st.info(f"💾 **Größe:** {file_size:.2f} MB")
-    
-    df = load_data()
-    
-    with col_info3:
-        st.success(f"✅ **{len(df):,} Datensätze**")
-    
-    if st.button("🔄 Neu laden"):
-        st.cache_data.clear()
-        st.rerun()
-    
-    st.markdown("---")
-    
-    # Monate extrahieren
-    cost_cols = [col for col in df.columns if col.startswith('Kosten ') and 'YTD' not in col]
-    months = [col.replace('Kosten ', '') for col in cost_cols]
-    
-    # Niederlassungs-Optionen
-    has_nl = 'Niederlassung' in df.columns
-    
-    if has_nl:
-        nl_options = ['Gesamt'] + sorted([nl for nl in df['Niederlassung'].unique() if nl != 'Unbekannt'])
+    # Admin / Niederlassung
+    if is_admin:
+        st.success("🔓 **Admin-Zugriff**")
+        master_nl_filter = st.selectbox("Niederlassung", nl_options, key='master_nl')
     else:
-        nl_options = ['Gesamt']
+        st.warning(f"🔒 **Zugriff beschränkt**")
+        st.info(f"**Niederlassung:** {user_niederlassung}")
+        master_nl_filter = user_niederlassung
     
-    # FILTER
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    st.markdown("---")
     
-    with col_f1:
-        if is_admin:
-            st.success("🔓 Admin")
-            master_nl_filter = st.selectbox("Niederlassung", nl_options, key='master_nl')
-        else:
-            st.warning(f"🔒 {user_niederlassung}")
-            master_nl_filter = user_niederlassung
+    # Produkt-Filter
+    st.markdown("### 📦 Produkt-Filter")
     
-    with col_f2:
-        has_product_cols = '1. Product Family' in df.columns
-        if has_product_cols:
-            product_families = ['Alle'] + sorted([f for f in df['1. Product Family'].dropna().unique() if str(f) != 'nan'])
-            selected_family = st.selectbox("Product Family", product_families, key='pf')
-        else:
-            selected_family = 'Alle'
+    has_product_cols = '1. Product Family' in df.columns
     
-    with col_f3:
-        if has_product_cols and selected_family != 'Alle':
+    if has_product_cols:
+        product_families = ['Alle'] + sorted([f for f in df['1. Product Family'].dropna().unique() if str(f) != 'nan'])
+        selected_family = st.selectbox("Product Family", product_families, key='pf')
+        
+        if selected_family != 'Alle':
             df_filtered_for_group = df[df['1. Product Family'] == selected_family]
         else:
             df_filtered_for_group = df
         
-        if has_product_cols:
-            product_groups = ['Alle'] + sorted([g for g in df_filtered_for_group['2. Product Group'].dropna().unique() if str(g) != 'nan'])
-            selected_group = st.selectbox("Product Group", product_groups, key='pg')
-        else:
-            selected_group = 'Alle'
+        product_groups = ['Alle'] + sorted([g for g in df_filtered_for_group['2. Product Group'].dropna().unique() if str(g) != 'nan'])
+        selected_group = st.selectbox("Product Group", product_groups, key='pg')
+    else:
+        selected_family = 'Alle'
+        selected_group = 'Alle'
     
-    with col_f4:
-        show_active = st.checkbox("Nur aktive YTD", value=True)
+    st.markdown("---")
+    show_active = st.checkbox("Nur Maschinen mit YTD-Aktivität", value=True)
     
     # Basis-Filterung
     df_base = df.copy()
@@ -367,6 +309,68 @@ with col_main:
     user_data['filter'] = master_nl_filter
     
     st.metric("Gefilterte Maschinen", f"{len(df_base):,}")
+    st.metric("Ausgewählte NL", master_nl_filter)
+    if has_product_cols and selected_family != 'Alle':
+        st.metric("Produkt-Filter", f"{selected_family}")
+    
+    # ========================================
+    # CHAT BEREICH
+    # ========================================
+    
+    st.markdown("---")
+    st.markdown("### 💬 Frag deine Daten")
+    st.caption("Powered by Claude AI")
+    
+    if 'chat_messages' not in st.session_state:
+        st.session_state['chat_messages'] = []
+    
+    # Chat Container
+    with st.container():
+        if len(st.session_state['chat_messages']) == 0:
+            st.info("👋 Stell mir eine Frage!")
+            st.markdown("**Beispiele:**")
+            st.markdown("• Top 5 Maschinen?")
+            st.markdown("• Verluste in Leipzig?")
+            st.markdown("• Marge-Trend?")
+        else:
+            for msg in st.session_state['chat_messages'][-5:]:  # Nur letzte 5
+                if msg['role'] == 'user':
+                    st.markdown(f"**Du:** {msg['content']}")
+                else:
+                    st.markdown(f"🤖 {msg['content']}")
+    
+    # Chat Input
+    user_question = st.text_input("Deine Frage:", key="chat_input", placeholder="z.B. Welche Maschine läuft am besten?")
+    
+    col_send, col_clear = st.columns([3, 1])
+    
+    with col_send:
+        if st.button("📤 Senden", use_container_width=True, disabled=not user_question):
+            if user_question:
+                st.session_state['chat_messages'].append({
+                    'role': 'user',
+                    'content': user_question
+                })
+                
+                response = f"Ich analysiere: '{user_question}'. Diese Funktion wird bald aktiviert."
+                
+                st.session_state['chat_messages'].append({
+                    'role': 'assistant',
+                    'content': response
+                })
+                
+                st.rerun()
+    
+    with col_clear:
+        if st.button("🗑️", use_container_width=True, help="Chat löschen"):
+            st.session_state['chat_messages'] = []
+            st.rerun()
+    
+    st.caption("🔒 Chat-Daten werden nicht gespeichert")
+
+# ========================================
+# MAIN DASHBOARD CONTENT (FULLWIDTH!)
+# ========================================
     
     # === ÜBERSICHT ===
     st.header("📊 Übersicht")
