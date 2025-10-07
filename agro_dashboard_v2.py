@@ -372,23 +372,23 @@ with st.sidebar:
 # MAIN DASHBOARD CONTENT (FULLWIDTH!)
 # ========================================
     
-    # === ÜBERSICHT ===
-    st.header("📊 Übersicht")
-    
-    ytd_kosten = df_base['Kosten YTD'].sum()
-    ytd_umsaetze = df_base['Umsätze YTD'].sum()
-    ytd_db = df_base['DB YTD'].sum()
-    ytd_marge = (ytd_db / ytd_umsaetze * 100) if ytd_umsaetze != 0 else 0
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("YTD Kosten", f"€ {ytd_kosten:,.0f}")
-    with col2:
-        st.metric("YTD Umsätze", f"€ {ytd_umsaetze:,.0f}")
-    with col3:
-        st.metric("YTD DB", f"€ {ytd_db:,.0f}", delta=f"{ytd_marge:.1f}%")
-    with col4:
-        st.metric("YTD Marge", f"{ytd_marge:.1f}%")
+# === ÜBERSICHT ===
+st.header("📊 Übersicht")
+
+ytd_kosten = df_base['Kosten YTD'].sum()
+ytd_umsaetze = df_base['Umsätze YTD'].sum()
+ytd_db = df_base['DB YTD'].sum()
+ytd_marge = (ytd_db / ytd_umsaetze * 100) if ytd_umsaetze != 0 else 0
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("YTD Kosten", f"€ {ytd_kosten:,.0f}")
+with col2:
+    st.metric("YTD Umsätze", f"€ {ytd_umsaetze:,.0f}")
+with col3:
+    st.metric("YTD DB", f"€ {ytd_db:,.0f}", delta=f"{ytd_marge:.1f}%")
+with col4:
+    st.metric("YTD Marge", f"{ytd_marge:.1f}%")
     
     # === MONATLICHE ENTWICKLUNG ===
     st.header("📈 Monatliche Entwicklung")
