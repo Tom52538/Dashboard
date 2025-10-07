@@ -14,8 +14,6 @@ import csv
 # SICHERHEITS-FUNKTIONEN
 # ========================================
 
-
-
 def ask_gemini(question, df):
     """
     Sendet Frage mit DataFrame-Kontext an Gemini API
@@ -80,7 +78,6 @@ DEINE ANTWORT:"""
         
     except Exception as e:
         return f"❌ Fehler bei der Gemini API Anfrage: {str(e)}\n\nBitte prüfe:\n- Ist der GEMINI_API_KEY korrekt in Streamlit Secrets?\n- Ist die Gemini API aktiviert?"
-
 
 def log_download(user, filename, niederlassung, num_rows):
     """Protokolliert jeden Download für Audit"""
@@ -376,18 +373,9 @@ with col_send:
                 Filter: {master_nl_filter}
                 """
                 
-                message = client.messages.create(
-                    model="gemini-sonnet-4-20250514",
-                    max_tokens=500,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": f"Du bist ein Dashboard-Analyst. Kontext:\n{data_summary}\n\nFrage: {user_question}"
-                        }
-                    ]
-                )
+                response = ask_gemini(user_question, df_base)
                 
-                response = message.content[0].text
+                response = response
                 
             except Exception as e:
                 response = f"❌ Fehler: {str(e)}"
@@ -462,7 +450,6 @@ st.sidebar.metric("Gefilterte Maschinen", f"{len(df_base):,}")
 st.sidebar.metric("Ausgewählte NL", master_nl_filter)
 if has_product_cols and selected_family != 'Alle':
     st.sidebar.metric("Produkt-Filter", f"{selected_family}")
-
 
 # === ÜBERSICHT SEKTION ===
 st.header("Übersicht")
