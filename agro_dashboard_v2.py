@@ -263,7 +263,7 @@ st.sidebar.header("⚙️ Filter")
 
 # === CHAT GANZ OBEN ===
 st.sidebar.markdown("### 💬 Frag deine Daten")
-st.sidebar.caption("Powered by Claude AI")
+st.sidebar.caption("Powered by Gemini AI")
 
 if 'chat_messages' not in st.session_state:
     st.session_state['chat_messages'] = []
@@ -293,13 +293,11 @@ with col_send:
                 'content': user_question
             })
             
-            # Claude API Call
+            # Gemini API Call
             try:
-                import anthropic
+                import google.generativeai as genai
                 
-                client = anthropic.Anthropic(
-                    api_key=st.secrets["ANTHROPIC_API_KEY"]
-                )
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 
                 # Daten-Kontext (anonymisiert)
                 data_summary = f"""
@@ -311,7 +309,7 @@ with col_send:
                 """
                 
                 message = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="gemini-sonnet-4-20250514",
                     max_tokens=500,
                     messages=[
                         {
