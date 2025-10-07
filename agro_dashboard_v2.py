@@ -28,7 +28,12 @@ def ask_gemini(question, df):
         import google.generativeai as genai
         
         # Gemini konfigurieren
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        try:
+            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        except KeyError:
+            return "❌ GEMINI_API_KEY fehlt in Streamlit Secrets! Bitte in Settings > Secrets hinzufügen."
+        except Exception as e:
+            return f"❌ API-Konfigurationsfehler: {str(e)}"
         
         # Gemini Modell initialisieren
         model = genai.GenerativeModel('gemini-pro')
@@ -47,7 +52,7 @@ Wichtige Statistiken:
 - Gesamt DB YTD: {df['DB YTD'].sum():,.2f} €
 - Durchschnittlicher Umsatz pro Maschine: {df['Umsätze YTD'].mean():,.2f} €
 - Durchschnittlicher DB pro Maschine: {df['DB YTD'].mean():,.2f} €
-- Durchschnittliche Marge: {(df['DB YTD'].sum() / df['Umsätze YTD'].sum() * 100):.1f}%
+- Durchschnittliche Marge: {(df['DB YTD'].sum() / df['Umsätze YTD'].sum() * 100) if df['Umsätze YTD'].sum() > 0 else 0:.1f}%
 
 Product Family mit niedrigstem DB:
 {df.groupby('1. Product Family')['DB YTD'].sum().sort_values().head(3).to_string() if '1. Product Family' in df.columns else 'Nicht verfügbar'}
@@ -78,7 +83,10 @@ DEINE ANTWORT:"""
         # Anfrage an Gemini senden
         response = model.generate_content(prompt)
         
-        return response.text
+        if response and response.text:
+            return response.text
+        else:
+            return "❌ Keine Antwort von Gemini erhalten."
         
     except Exception as e:
         return f"❌ Fehler bei der Gemini API Anfrage: {str(e)}\n\nBitte prüfe:\n- Ist der GEMINI_API_KEY korrekt in Streamlit Secrets?\n- Ist die Gemini API aktiviert?"
@@ -144,7 +152,7 @@ def check_password():
     return False
 
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=3600)  # Cache für 1 Stunde
 def load_data():
     """Lädt Dashboard_Master_DE_v2.xlsx aus dem Repository"""
     try:
@@ -192,14 +200,13 @@ st.set_page_config(page_title="AGRO F66 Dashboard", layout="wide")
 if not check_password():
     st.stop()
 
+# Session State Initialisierung
+if 'chat_messages' not in st.session_state:
+    st.session_state['chat_messages'] = []
+
 st.title("🚜 AGRO F66 Maschinen Dashboard v2.0")
 st.caption(f"Angemeldet als: **{st.session_state['username_validated']}**")
 
-# ============================================================================
-# ENDE TEIL 1
-# ============================================================================
-# SPEICHERE DIESEN TEIL ALS: agro_dashboard_v2_TEIL1.py
-# DANN KOMMT TEIL 2 mit Sidebar, Filtern und AI Chat
 # Info-Banner
 last_update, file_size = get_file_info()
 col_info1, col_info2, col_info3 = st.columns(3)
@@ -225,9 +232,15 @@ cost_cols = [col for col in df.columns if col.startswith('Kosten ') and 'YTD' no
 months = [col.replace('Kosten ', '') for col in cost_cols]
 
 has_nl = 'Niederlassung' in df.columns
-nl_options = ['Gesamt'] + sorted([nl for nl in df['Niederlassung'].unique() if nl != 'Unbekannt']) if has_nl else ['Gesamt']
+nl_options = ['Gesamt'] + sorted([
+    nl for nl in df['Niederlassung'].dropna().unique() 
+    if str(nl) not in ['Unbekannt', 'nan', '']
+]) if has_nl else ['Gesamt']
 
+# ============================================================================
 # SIDEBAR - Filter & AI Chat
+# ============================================================================
+
 st.sidebar.header("⚙️ Filter")
 
 # AI CHAT - OBEN IN SIDEBAR
@@ -248,23 +261,8 @@ with col_send:
             })
             
             # Gemini API Call
-            try:
-                import google.generativeai as genai
-                
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                
-                # Daten-Kontext (anonymisiert)
-                data_summary = f"""
-Datensatz: {len(df)} Maschinen
-Filter: {master_nl_filter}
-"""
-                
+            with st.spinner("🤔 Denke nach..."):
                 response = ask_gemini(user_question, df)
-                
-                response = response
-                
-            except Exception as e:
-                response = f"❌ Fehler: {str(e)}"
             
             st.session_state['chat_messages'].append({
                 'role': 'assistant',
@@ -277,6 +275,15 @@ with col_clear:
     if st.button("🗑️", use_container_width=True, help="Chat löschen"):
         st.session_state['chat_messages'] = []
         st.rerun()
+
+# Chat-Verlauf anzeigen
+if st.session_state['chat_messages']:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📜 Letzte Antworten")
+    for msg in reversed(st.session_state['chat_messages'][-3:]):
+        if msg['role'] == 'assistant':
+            with st.sidebar.expander(f"💡 {msg['content'][:50]}..."):
+                st.write(msg['content'])
 
 st.sidebar.caption("🔒 Chat-Daten werden nicht gespeichert")
 
@@ -330,13 +337,21 @@ if has_product_cols:
     if selected_group != 'Alle':
         df_base = df_base[df_base['2. Product Group'] == selected_group]
 
+# Prüfung auf leere Daten
+if len(df_base) == 0:
+    st.warning("⚠️ Keine Daten mit den aktuellen Filtern gefunden! Bitte Filter anpassen.")
+    st.stop()
+
 st.sidebar.metric("Gefilterte Maschinen", f"{len(df_base):,}")
 st.sidebar.metric("Ausgewählte NL", master_nl_filter)
 if has_product_cols and selected_family != 'Alle':
     st.sidebar.metric("Produkt-Filter", f"{selected_family}")
 
+# ============================================================================
 # ÜBERSICHT SEKTION
-st.header("Übersicht")
+# ============================================================================
+
+st.header("📊 Übersicht")
 
 df_overview = df_base.copy()
 
@@ -354,8 +369,12 @@ with col3:
     st.metric("YTD Deckungsbeitrag", f"€ {ytd_db:,.0f}", delta=f"{ytd_marge:.1f}%")
 with col4:
     st.metric("YTD Marge", f"{ytd_marge:.1f}%")
+
+# ============================================================================
 # MONATLICHE ENTWICKLUNG
-st.header("Monatliche Entwicklung")
+# ============================================================================
+
+st.header("📈 Monatliche Entwicklung")
 
 df_monthly_base = df_base.copy()
 
@@ -425,8 +444,11 @@ fig.update_yaxes(title_text="Euro (€)", row=2, col=2)
 
 st.plotly_chart(fig, use_container_width=True)
 
+# ============================================================================
 # TOP PERFORMER
-st.header("Top 10 Maschinen (YTD)")
+# ============================================================================
+
+st.header("🏆 Top 10 Maschinen (YTD)")
 
 st.markdown("### 🔽 Sortieren nach:")
 sort_top = st.selectbox(
@@ -440,15 +462,18 @@ df_top_relevant = df_top[df_top['Umsätze YTD'] >= 1000]
 
 if "DB YTD" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'DB YTD')
+    top_10_display = top_10.sort_values('DB YTD', ascending=False)
 elif "Umsätze YTD" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Umsätze YTD')
+    top_10_display = top_10.sort_values('Umsätze YTD', ascending=False)
 elif "Marge YTD %" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Marge YTD %')
+    top_10_display = top_10.sort_values('Marge YTD %', ascending=False)
 else:
     top_10 = df_top_relevant.nlargest(10, 'Kosten YTD')
+    top_10_display = top_10.sort_values('Kosten YTD', ascending=False)
 
-top_10_display = top_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
-top_10_display = top_10_display.sort_values('DB YTD', ascending=False)
+top_10_display = top_10_display[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 st.markdown("#### Tabelle & Chart")
 
@@ -501,8 +526,11 @@ with col2:
     )
     st.plotly_chart(fig_top, use_container_width=True)
 
+# ============================================================================
 # WORST PERFORMER
-st.header("Worst 10 Maschinen (YTD)")
+# ============================================================================
+
+st.header("📉 Worst 10 Maschinen (YTD)")
 
 st.markdown("### 🔽 Sortieren nach:")
 sort_worst = st.selectbox(
@@ -516,15 +544,18 @@ df_worst_relevant = df_worst[df_worst['Kosten YTD'] >= 1000]
 
 if "DB YTD" in sort_worst:
     worst_10 = df_worst_relevant.nsmallest(10, 'DB YTD')
+    worst_10_display = worst_10.sort_values('DB YTD', ascending=True)
 elif "Marge YTD %" in sort_worst:
     worst_10 = df_worst_relevant.nsmallest(10, 'Marge YTD %')
+    worst_10_display = worst_10.sort_values('Marge YTD %', ascending=True)
 elif "Kosten YTD" in sort_worst:
     worst_10 = df_worst_relevant.nlargest(10, 'Kosten YTD')
+    worst_10_display = worst_10.sort_values('Kosten YTD', ascending=False)
 else:
     worst_10 = df_worst_relevant.nsmallest(10, 'Umsätze YTD')
+    worst_10_display = worst_10.sort_values('Umsätze YTD', ascending=True)
 
-worst_10_display = worst_10[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
-worst_10_display = worst_10_display.sort_values('DB YTD', ascending=True)
+worst_10_display = worst_10_display[['VH-nr.', 'Code', 'Omschrijving', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
 
 st.markdown("#### Tabelle & Chart")
 
@@ -579,7 +610,10 @@ with col2:
     )
     st.plotly_chart(fig_worst, use_container_width=True)
 
+# ============================================================================
 # PRODUKTANALYSE
+# ============================================================================
+
 if has_product_cols:
     st.header("📦 Produktanalyse")
     
@@ -630,8 +664,11 @@ if has_product_cols:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
 
+# ============================================================================
+# DETAILLIERTE MONATSDATEN
+# ============================================================================
 
-st.header("Detaillierte Monatsdaten")
+st.header("📅 Detaillierte Monatsdaten")
 
 df_table_base = df_base.copy()
 
@@ -704,7 +741,7 @@ with col2:
     
     st.plotly_chart(fig_mini, use_container_width=True)
 
-st.markdown("### Monatliche Insights")
+st.markdown("### 📊 Monatliche Insights")
 col1, col2, col3, col4 = st.columns(4)
 
 best_month = df_table.loc[df_table['Marge %'].idxmax()]
@@ -720,6 +757,10 @@ with col3:
     st.metric("Höchster Umsatz", highest_revenue['Monat'], f"€ {highest_revenue['Umsaetze']:,.0f}")
 with col4:
     st.metric("Gesamt DB (YTD)", f"€ {total_db:,.0f}", f"{(total_db/df_table['Umsaetze'].sum()*100):.1f}%")
+
+# ============================================================================
+# MASCHINEN OHNE UMSÄTZE
+# ============================================================================
 
 st.header("⚠️ Maschinen ohne Umsätze (nur Kosten)")
 st.markdown("Diese Maschinen verursachen Kosten aber generieren keinen Umsatz")
@@ -753,68 +794,99 @@ with col_sum4:
     pareto_cost = df_no_revenue_pareto['Kosten YTD'].sum()
     pareto_cost_percentage = (pareto_cost / total_cost * 100) if total_cost > 0 else 0
     st.metric("Deren Kosten", f"€ {pareto_cost:,.0f} ({pareto_cost_percentage:.0f}%)")
-        
 
-    # Top Produkte (nach Group)
-    if '2. Product Group' in df_products.columns:
-        st.markdown("---")
-        st.markdown("#### Top 20 Product Groups")
-            
-        st.markdown("### 🔽 Sortieren nach:")
-        sort_groups = st.selectbox(
-            "Wähle Sortierung für Product Groups:",
-            ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
-            key='sort_product_groups'
-        )
-            
-        product_group_stats = df_products.groupby('2. Product Group').agg({
-            'VH-nr.': 'count',
-            'Umsätze YTD': 'sum',
-            'DB YTD': 'sum'
-        }).reset_index()
-            
-        product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
-        product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
-            
-        if "Umsätze YTD" in sort_groups:
-            product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
-        elif "DB YTD" in sort_groups:
-            product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
-        elif "Marge %" in sort_groups:
-            product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
-        else:
-            product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
-            
-        col1, col2 = st.columns([1, 1])
-            
-        with col1:
-            display_groups = product_group_stats.copy()
-            display_groups['Anzahl'] = display_groups['Anzahl'].apply(lambda x: f"{x:,}")
-            display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
-            display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
-            display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
-                
-            st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
-            
-        with col2:
-            fig_groups = go.Figure()
-                
-            fig_groups.add_trace(go.Bar(
-                y=product_group_stats['Product Group'],
-                x=product_group_stats['Umsätze YTD'],
-                orientation='h',
-                marker_color='#3b82f6',
-                text=product_group_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
-                textposition='outside'
-            ))
-                
-            fig_groups.update_layout(
-                height=400,
-                xaxis_title='Umsatz (€)',
-                yaxis=dict(autorange='reversed'),
-                showlegend=False
-            )
-                
-            st.plotly_chart(fig_groups, use_container_width=True)
+# Anzeige der Daten
+if len(df_no_revenue_display) > 0:
+    display_no_rev = df_no_revenue_display.copy()
+    display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
+    display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
+    st.dataframe(display_no_rev, use_container_width=True, hide_index=True)
+    
+    st.download_button(
+        label="📥 Export Maschinen ohne Umsätze (Excel)",
+        data=to_excel(df_no_revenue_display),
+        file_name=f'maschinen_ohne_umsaetze_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+else:
+    st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
+
+# ============================================================================
+# TOP 20 PRODUCT GROUPS
+# ============================================================================
+
+if has_product_cols and '2. Product Group' in df_base.columns:
+    st.markdown("---")
+    st.header("🔝 Top 20 Product Groups")
+    
+    st.markdown("### 🔽 Sortieren nach:")
+    sort_groups = st.selectbox(
+        "Wähle Sortierung für Product Groups:",
+        ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
+        key='sort_product_groups'
+    )
+    
+    df_for_groups = df_base.copy()
+    product_group_stats = df_for_groups.groupby('2. Product Group').agg({
+        'VH-nr.': 'count',
+        'Umsätze YTD': 'sum',
+        'DB YTD': 'sum'
+    }).reset_index()
+    
+    product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
+    product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
+    
+    if "Umsätze YTD" in sort_groups:
+        product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
+    elif "DB YTD" in sort_groups:
+        product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
+    elif "Marge %" in sort_groups:
+        product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
     else:
-    st.info("Keine Daten für Produktanalyse verfügbar. Bitte Filter anpassen.")
+        product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        display_groups = product_group_stats.copy()
+        display_groups['Anzahl'] = display_groups['Anzahl'].apply(lambda x: f"{x:,}")
+        display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
+        display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
+        display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
+        
+        st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
+        
+        st.download_button(
+            label="📥 Export Product Groups (Excel)",
+            data=to_excel(product_group_stats),
+            file_name=f'product_groups_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    
+    with col2:
+        fig_groups = go.Figure()
+        
+        fig_groups.add_trace(go.Bar(
+            y=product_group_stats['Product Group'],
+            x=product_group_stats['Umsätze YTD'],
+            orientation='h',
+            marker_color='#3b82f6',
+            text=product_group_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+            textposition='outside'
+        ))
+        
+        fig_groups.update_layout(
+            height=400,
+            xaxis_title='Umsatz (€)',
+            yaxis=dict(autorange='reversed'),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_groups, use_container_width=True)
+
+# ============================================================================
+# FOOTER
+# ============================================================================
+
+st.markdown("---")
+st.caption("🚜 AGRO F66 Dashboard v2.0 | Entwickelt mit Streamlit & Plotly | Powered by Gemini AI")
