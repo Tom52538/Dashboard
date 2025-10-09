@@ -172,7 +172,7 @@ class SimpleAuth:
     def require_auth(self):
         """Decorator-Funktion: Erfordert Login"""
         if not self.is_authenticated():
-            st.warning(⚠️ Bitte zuerst einloggen!")
+            st.warning("Bitte zuerst einloggen!")
             st.stop()
 
 
@@ -213,7 +213,7 @@ def show_login_page():
     
     if submit:
         if not username or not password:
-            st.error("❌ Bitte alle Felder ausfüllen!")
+            st.error("Bitte alle Felder ausfüllen!")
             return
         
         auth = SimpleAuth()
@@ -223,15 +223,15 @@ def show_login_page():
             # Login erfolgreich
             st.session_state['authenticated'] = True
             st.session_state['user'] = user_data
-            st.success(f"✅ Willkommen, {user_data['name']}!")
+            st.success(f"Willkommen, {user_data['name']}!")
             st.rerun()
         else:
-            st.error("❌ Ungültige Anmeldedaten!")
+            st.error("Ungültige Anmeldedaten!")
     
     # Info-Box
     st.markdown("---")
     st.info("""
-    **ℹ️ Hinweis:**
+    **Hinweis:**
     - SuperAdmin: Zugriff auf alle Niederlassungen
     - Admin: Zugriff auf mehrere Niederlassungen
     - User: Zugriff auf eine Niederlassung
