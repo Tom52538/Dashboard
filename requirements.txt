@@ -15,5 +15,8 @@ google-auth==2.23.0
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
 
+# Für v4: Google Drive Download
+gdown==5.1.0
+
 # Für v1 (falls noch verwendet)
 # anthropic==0.39.0
