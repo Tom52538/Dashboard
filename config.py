@@ -10,7 +10,7 @@ def get_config():
     Gibt Config basierend auf Environment zurück
     Liest 'environment' aus secrets.toml
     """
-    env = st.secrets.get("environment", "production")
+    env = st.secrets.get("environment", {}).get("environment", "production")
     
     config = {
         "development": {
@@ -29,7 +29,10 @@ def get_config():
         }
     }
     
-    return config.get(env, config["production"])
+    # Sicherer Fallback
+    if env in config:
+        return config[env]
+    return config["production"]
 
 # Globale Config - wird beim Import geladen
 CONFIG = get_config()
