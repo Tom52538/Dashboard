@@ -121,7 +121,7 @@ def check_password():
         
         # Lade users_v2.json (GEÄNDERT!)
         try:
-            with open('users_v2.json', 'r') as f:
+            with open('users_v2.json', 'r', encoding='utf-8') as f:
                 users = json.load(f)
         except:
             st.error("❌ Fehler beim Laden der Benutzerdaten (users_v2.json)")
