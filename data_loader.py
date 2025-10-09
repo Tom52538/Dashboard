@@ -126,11 +126,11 @@ def load_data():
     credentials = st.session_state['credentials']
     
     # File ID aus Secrets
-    if 'drive' not in st.secrets or 'file_id' not in st.secrets['drive']:
+    if 'google_drive' not in st.secrets or 'file_id' not in st.secrets['google_drive']:
         st.error("❌ Keine File ID in secrets.toml konfiguriert!")
         return None
     
-    file_id = st.secrets['drive']['file_id']
+    file_id = st.secrets['google_drive']['file_id']
     
     # Von Drive laden
     df = load_from_drive(credentials, file_id)
