@@ -373,7 +373,7 @@ st.header("🏆 Top 10 Maschinen (YTD)")
 st.markdown("### 🔽 Sortieren nach:")
 sort_top = st.selectbox(
     "Wähle Sortierung für Top 10:",
-    ["DB YTD (Höchster Gewinn)", "Umsätze YTD (Höchster Umsatz)", "Marge YTD % (Beste Marge)", "Kosten YTD (Höchste Kosten)"],
+    ["DB YTD (Höchster Gewinn)", "Umsaetze YTD (Höchster Umsatz)", "Marge YTD % (Beste Marge)", "Kosten YTD (Höchste Kosten)"],
     key='sort_top_10'
 )
 
@@ -382,7 +382,7 @@ df_top_relevant = df_top[df_top['Umsaetze YTD'] >= 1000]
 
 if "DB YTD" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'DB YTD')
-elif "Umsätze YTD" in sort_top:
+elif "Umsaetze YTD" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Umsaetze YTD')
 elif "Marge YTD %" in sort_top:
     top_10 = df_top_relevant.nlargest(10, 'Marge YTD %')
@@ -455,7 +455,7 @@ st.header("📉 Worst 10 Maschinen (YTD)")
 st.markdown("### 🔽 Sortieren nach:")
 sort_worst = st.selectbox(
     "Wähle Sortierung für Worst 10:",
-    ["DB YTD (Niedrigster/Negativster)", "Marge YTD % (Schlechteste Marge)", "Kosten YTD (Höchste Kosten)", "Umsätze YTD (Niedrigster Umsatz)"],
+    ["DB YTD (Niedrigster/Negativster)", "Marge YTD % (Schlechteste Marge)", "Kosten YTD (Höchste Kosten)", "Umsaetze YTD (Niedrigster Umsatz)"],
     key='sort_worst_10'
 )
 
@@ -554,11 +554,11 @@ if has_product_cols:
         st.markdown("### 🔽 Sortieren nach:")
         sort_product_mix = st.selectbox(
             "Wähle Sortierung für Produkt-Mix:",
-            ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)", "Kosten YTD (Höchste)"],
+            ["Umsaetze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)", "Kosten YTD (Höchste)"],
             key='sort_product_mix'
         )
         
-        if "Umsätze YTD" in sort_product_mix:
+        if "Umsaetze YTD" in sort_product_mix:
             product_family_stats = product_family_stats.sort_values('Umsaetze YTD', ascending=False)
         elif "DB YTD" in sort_product_mix:
             product_family_stats = product_family_stats.sort_values('DB YTD', ascending=False)
@@ -593,7 +593,7 @@ if has_product_cols:
             st.markdown("### 🔽 Sortieren nach:")
             sort_groups = st.selectbox(
                 "Wähle Sortierung für Product Groups:",
-                ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
+                ["Umsaetze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
                 key='sort_product_groups'
             )
             
@@ -606,7 +606,7 @@ if has_product_cols:
             product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsaetze YTD', 'DB YTD']
             product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsaetze YTD'] * 100).fillna(0)
             
-            if "Umsätze YTD" in sort_groups:
+            if "Umsaetze YTD" in sort_groups:
                 product_group_stats = product_group_stats.sort_values('Umsaetze YTD', ascending=False).head(20)
             elif "DB YTD" in sort_groups:
                 product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
@@ -736,3 +736,4 @@ else:
 
 st.markdown("---")
 st.caption("🚜 AGRO F66 Dashboard v4.0 | Simple Login | 📊 Alle Daten in Echtzeit")
+
