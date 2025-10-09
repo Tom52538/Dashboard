@@ -1,5 +1,10 @@
 {
-  "admin": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+  "admin": {
+    "password": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+    "niederlassung": "Gesamt",
+    "name": "Administrator",
+    "role": "admin"
+  },
   "leipzig": {
     "password": "a21740e50b93bc883be81a0f430d1aaa8c8046977c3134aa0219b79f96d9fa6c",
     "niederlassung": "Leipzig",
