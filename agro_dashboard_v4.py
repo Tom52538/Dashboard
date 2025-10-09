@@ -36,12 +36,23 @@ st.markdown(f"Willkommen, **{user['name']}**!")
 # Daten laden
 @st.cache_data
 def load_data():
-    """Lade Excel-Daten"""
+    """Lade Excel-Daten aus Google Drive"""
     try:
-        df = pd.read_excel('Dashboard_Master_DE_v2.xlsx')
+        import gdown
+        
+        # File ID aus Secrets
+        file_id = st.secrets["google_drive"]["file_id"]
+        url = f'https://drive.google.com/uc?id={file_id}'
+        
+        # Download von Google Drive
+        output = 'Dashboard_Master_DE_v2.xlsx'
+        gdown.download(url, output, quiet=False)
+        
+        # Excel laden
+        df = pd.read_excel(output)
         return df
-    except FileNotFoundError:
-        st.error("❌ Datei 'Dashboard_Master_DE_v2.xlsx' nicht gefunden!")
+    except Exception as e:
+        st.error(f"❌ Fehler beim Laden: {e}")
         return None
 
 df = load_data()

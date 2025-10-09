@@ -172,7 +172,7 @@ class SimpleAuth:
     def require_auth(self):
         """Decorator-Funktion: Erfordert Login"""
         if not self.is_authenticated():
-            st.warning("⚠️ Bitte zuerst einloggen!")
+            st.warning(⚠️ Bitte zuerst einloggen!")
             st.stop()
 
 
