@@ -178,11 +178,7 @@ class SimpleAuth:
 
 def show_login_page():
     """Zeige Login-Seite"""
-    st.set_page_config(
-        page_title="AGRO F66 - Login",
-        page_icon="🚜",
-        layout="wide"
-    )
+    # KEIN st.set_page_config() hier - wird in agro_dashboard_v4.py gemacht!
     
     # Styling
     st.markdown("""
