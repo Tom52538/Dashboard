@@ -119,12 +119,12 @@ def check_password():
         # Hash das Passwort
         hashed = hashlib.sha256(password.encode()).hexdigest()
         
-        # Lade users.json
+        # Lade users_v2.json (GEÄNDERT!)
         try:
-            with open('users.json', 'r') as f:
+            with open('users_v2.json', 'r') as f:
                 users = json.load(f)
         except:
-            st.error("❌ Fehler beim Laden der Benutzerdaten")
+            st.error("❌ Fehler beim Laden der Benutzerdaten (users_v2.json)")
             return
         
         # Check credentials
@@ -817,7 +817,7 @@ else:
 
 if has_product_cols and '2. Product Group' in df_base.columns:
     st.markdown("---")
-    st.header("🔝 Top 20 Product Groups")
+    st.header("🔍 Top 20 Product Groups")
     
     st.markdown("### 🔽 Sortieren nach:")
     sort_groups = st.selectbox(
