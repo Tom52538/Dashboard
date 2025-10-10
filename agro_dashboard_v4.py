@@ -25,11 +25,48 @@ st.set_page_config(
 # CSS für Horizontal Scrolling
 st.markdown("""
     <style>
-    [data-testid="stDataFrame"] {
+    /* Horizontales Scrolling für Dataframes */
+    div[data-testid="stDataFrame"] {
         overflow-x: auto !important;
+        overflow-y: hidden !important;
     }
+    
     div[data-testid="stDataFrame"] > div {
-        overflow-x: auto;
+        overflow-x: auto !important;
+        overflow-y: auto !important;
+        max-height: 400px;
+    }
+    
+    /* Scrollbar Styling - Horizontal */
+    div[data-testid="stDataFrame"]::-webkit-scrollbar {
+        height: 12px;
+        background: #f0f2f6;
+    }
+    
+    div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb {
+        background: #3b82f6;
+        border-radius: 6px;
+        border: 2px solid #f0f2f6;
+    }
+    
+    div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb:hover {
+        background: #2563eb;
+    }
+    
+    /* Scrollbar Styling - Vertikal */
+    div[data-testid="stDataFrame"] > div::-webkit-scrollbar {
+        width: 12px;
+        background: #f0f2f6;
+    }
+    
+    div[data-testid="stDataFrame"] > div::-webkit-scrollbar-thumb {
+        background: #3b82f6;
+        border-radius: 6px;
+        border: 2px solid #f0f2f6;
+    }
+    
+    div[data-testid="stDataFrame"] > div::-webkit-scrollbar-thumb:hover {
+        background: #2563eb;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -423,6 +460,7 @@ with col2:
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
     )
     st.plotly_chart(fig_top, use_container_width=True)
+    
 
 st.markdown("---")
 # ========================================
