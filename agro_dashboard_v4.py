@@ -196,6 +196,9 @@ if has_product_cols:
         df_base = df_base[df_base['1. Product Family'] == selected_family]
     if selected_group != 'Alle':
         df_base = df_base[df_base['2. Product Group'] == selected_group]
+        
+# User-Info in Sidebar
+show_user_info()
 
 # SIDEBAR METRIKEN
 st.sidebar.markdown("---")
@@ -204,9 +207,6 @@ st.sidebar.metric("Gefilterte Maschinen", f"{len(df_base):,}")
 st.sidebar.metric("Ausgewählte NL", master_nl_filter)
 if has_product_cols and selected_family != 'Alle':
     st.sidebar.metric("Produkt-Filter", f"{selected_family}")
-
-# User-Info in Sidebar
-show_user_info()
 
 # EXPORT ALLE MASCHINEN
 st.sidebar.markdown("---")
@@ -697,3 +697,4 @@ else:
 # ========================================
 st.markdown("---")
 st.caption("🚜 AGRO F66 Dashboard v4.0 |  | 📊 ")
+
