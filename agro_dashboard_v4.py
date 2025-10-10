@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-AGRO F66 Dashboard v4.0 - KORRIGIERTE VERSION
-Mit Simple Login System - ALLE Spaltennamen geprüft!
-TEIL 1 von 2: Imports bis Datenfilter
+AGRO F66 Dashboard v4.0 - KOMPLETT
+Mit Simple Auth + ALLE Features
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime
 from io import BytesIO
+from auth_simple import SimpleAuth, show_login_page, show_user_info
 
 # ========================================
 # PAGE CONFIG
@@ -22,52 +23,29 @@ st.set_page_config(
 )
 
 # ========================================
+# HELPER FUNCTIONS
+# ========================================
+def to_excel(df):
+    """Konvertiert DataFrame zu Excel-Bytes für Download"""
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Daten')
+        worksheet = writer.sheets['Daten']
+        for idx, col in enumerate(df.columns):
+            max_length = max(df[col].astype(str).map(len).max(), len(str(col)))
+            worksheet.column_dimensions[chr(65 + idx)].width = min(max_length + 2, 50)
+    return output.getvalue()
+
+# ========================================
 # AUTHENTICATION
 # ========================================
-def check_credentials(username, password):
-    """Simple authentication - Passwörter plain text für Demo"""
-    users = {
-        "tgerkens@colle.eu": {"password": "test123", "name": "Tobias Gerkens", "role": "superadmin", "niederlassungen": "Gesamt"},
-        "thell@colle.eu": {"password": "test123", "name": "Theresa Hell", "role": "admin", "niederlassungen": "Augsburg, München, Stuttgart"},
-        "ckuehner@colle.eu": {"password": "test123", "name": "Christian Kühner", "role": "admin", "niederlassungen": "Arnstadt, Halle, Leipzig"},
-        "sschulz@colle.eu": {"password": "test123", "name": "Simon Schulz", "role": "admin", "niederlassungen": "Bremen, Hamburg, Hannover"},
-        "augsburg": {"password": "test123", "name": "User Augsburg", "role": "user", "niederlassungen": "Augsburg"},
-        "muenchen": {"password": "test123", "name": "User München", "role": "user", "niederlassungen": "München"},
-        "stuttgart": {"password": "test123", "name": "User Stuttgart", "role": "user", "niederlassungen": "Stuttgart"},
-        "arnstadt": {"password": "test123", "name": "User Arnstadt", "role": "user", "niederlassungen": "Arnstadt"},
-        "halle": {"password": "test123", "name": "User Halle", "role": "user", "niederlassungen": "Halle"},
-        "leipzig": {"password": "test123", "name": "User Leipzig", "role": "user", "niederlassungen": "Leipzig"},
-        "bremen": {"password": "test123", "name": "User Bremen", "role": "user", "niederlassungen": "Bremen"},
-        "hamburg": {"password": "test123", "name": "User Hamburg", "role": "user", "niederlassungen": "Hamburg"},
-        "hannover": {"password": "test123", "name": "User Hannover", "role": "user", "niederlassungen": "Hannover"},
-        "kassel": {"password": "test123", "name": "User Kassel", "role": "user", "niederlassungen": "Kassel"},
-        "koeln": {"password": "test123", "name": "User Köln", "role": "user", "niederlassungen": "Köln"}
-    }
-    
-    if username in users and users[username]["password"] == password:
-        return users[username]
-    return None
+auth = SimpleAuth()
 
-# Login Screen
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.title("🚜 AGRO F66 Dashboard")
-    st.subheader("Bitte anmelden")
-    
-    username = st.text_input("Benutzername")
-    password = st.text_input("Passwort", type="password")
-    
-    if st.button("Anmelden"):
-        user_data = check_credentials(username, password)
-        if user_data:
-            st.session_state.logged_in = True
-            st.session_state.user = user_data
-            st.rerun()
-        else:
-            st.error("❌ Ungültige Anmeldedaten!")
+if not auth.is_authenticated():
+    show_login_page()
     st.stop()
+
+current_user = auth.get_current_user()
 
 # ========================================
 # DATEN LADEN
@@ -77,6 +55,20 @@ def load_data():
     """Lädt Excel-Daten"""
     try:
         df = pd.read_excel('Dashboard_Master_DE_v2.xlsx')
+        
+        # VH-nr. als String
+        if 'VH-nr.' in df.columns:
+            df['VH-nr.'] = df['VH-nr.'].astype(str).str.strip()
+        
+        # Numerische Spalten konvertieren
+        kosten_spalten = [col for col in df.columns if 'Kosten' in col]
+        umsatz_spalten = [col for col in df.columns if 'Umsätze' in col]
+        db_spalten = [col for col in df.columns if 'DB' in col]
+        
+        for col in kosten_spalten + umsatz_spalten + db_spalten:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).round(2)
+        
         return df
     except Exception as e:
         st.error(f"❌ Fehler beim Laden: {e}")
@@ -88,60 +80,256 @@ if df is None:
     st.stop()
 
 # ========================================
-# HEADER & USER INFO
+# HEADER
 # ========================================
-col1, col2, col3 = st.columns([2, 3, 1])
-with col1:
-    st.title("🚜 AGRO F66 Dashboard")
-with col2:
-    st.markdown(f"### 👤 {st.session_state.user['name']}")
-with col3:
-    if st.button("🚪 Logout"):
-        st.session_state.logged_in = False
+col_header1, col_header2 = st.columns([4, 1])
+
+with col_header1:
+    st.title("🚜 AGRO F66 Maschinen Dashboard")
+    st.caption(f"Angemeldet als: **{current_user['name']}**")
+    if current_user['role'] == 'superadmin':
+        st.caption("🔧 Super Admin Zugriff")
+    elif current_user['role'] == 'admin':
+        st.caption("⭐ Admin-Zugriff")
+
+with col_header2:
+    st.write("")
+    st.write("")
+    if st.button("🚪 Logout", use_container_width=True):
+        auth.logout()
         st.rerun()
 
-# ========================================
-# SIDEBAR FILTER
-# ========================================
-st.sidebar.header("🎯 Filter")
+st.markdown("---")
 
-# Niederlassung Filter basierend auf User-Rolle
-user_role = st.session_state.user['role']
-user_niederlassungen = st.session_state.user['niederlassungen']
+# Info-Banner
+col_info1, col_info2, col_info3 = st.columns(3)
 
-if user_role == 'superadmin':
-    # SuperAdmin sieht alle
-    niederlassungen_list = ['Gesamt'] + sorted(df['Master NL'].unique().tolist())
+with col_info1:
+    st.info(f"📅 **Geladen:** {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+with col_info2:
+    st.info(f"📊 **Datei:** Dashboard_Master_DE_v2.xlsx")
+with col_info3:
+    st.success(f"✅ **{len(df):,} Datensätze** geladen")
+
+if st.button("🔄 Daten neu laden"):
+    st.cache_data.clear()
+    st.rerun()
+
+st.markdown("---")
+
+# ========================================
+# MONATE EXTRAHIEREN
+# ========================================
+cost_cols = [col for col in df.columns if col.startswith('Kosten ') and 'YTD' not in col]
+months = [col.replace('Kosten ', '').replace(' 25', '') for col in cost_cols]
+
+# ========================================
+# SIDEBAR - FILTER
+# ========================================
+st.sidebar.header("⚙️ Filter")
+
+# MASTER-FILTER - NIEDERLASSUNG
+st.sidebar.markdown("### 🎯 Master-Filter")
+st.sidebar.info("Dieser Filter gilt für ALLE Auswertungen")
+
+user_niederlassungen = current_user['niederlassungen']
+
+# Filter-Optionen basierend auf Rolle
+if user_niederlassungen == ['alle']:
+    niederlassungen_list = ['Gesamt'] + sorted(df['Niederlassung'].unique().tolist())
 else:
-    # Andere User sehen nur ihre zugewiesenen Niederlassungen
-    if user_niederlassungen == 'Gesamt':
-        niederlassungen_list = ['Gesamt'] + sorted(df['Master NL'].unique().tolist())
-    else:
-        allowed = [nl.strip() for nl in user_niederlassungen.split(',')]
-        niederlassungen_list = allowed
+    niederlassungen_list = ['Gesamt'] + user_niederlassungen
 
 master_nl_filter = st.sidebar.selectbox(
-    "Niederlassung",
-    niederlassungen_list,
-    index=0
+    "Niederlassung (alle Sektionen)", 
+    niederlassungen_list, 
+    key='master_nl'
 )
 
-# Daten filtern
-if master_nl_filter == "Gesamt":
-    df_base = df.copy()
+# PRODUKT-FILTER
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📦 Produkt-Filter")
+
+has_product_cols = '1. Product Family' in df.columns
+
+if has_product_cols:
+    product_families = ['Alle'] + sorted([fam for fam in df['1. Product Family'].dropna().unique() if str(fam) != 'nan'])
+    selected_family = st.sidebar.selectbox("Product Family", product_families, key='product_family')
+    
+    # Product Group - dynamisch basierend auf Family
+    if selected_family != 'Alle':
+        df_filtered_for_group = df[df['1. Product Family'] == selected_family]
+    else:
+        df_filtered_for_group = df
+    
+    product_groups = ['Alle'] + sorted([grp for grp in df_filtered_for_group['2. Product Group'].dropna().unique() if str(grp) != 'nan'])
+    selected_group = st.sidebar.selectbox("Product Group", product_groups, key='product_group')
 else:
-    df_base = df[df['Master NL'] == master_nl_filter].copy()
-
-# Filter: Nur Maschinen mit Aktivität
-df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsaetze YTD'] != 0)]
-
-# Debug Info
-with st.sidebar.expander("🔍 Debug Info"):
-    st.write(f"**Gefilterte Maschinen:** {len(df_base)}")
-    st.write(f"**Verfügbare Spalten:** {list(df_base.columns)}")
+    selected_family = 'Alle'
+    selected_group = 'Alle'
 
 st.sidebar.markdown("---")
-st.sidebar.caption("📊 Version 4.0 | Simple Login")
+
+# AKTIVITÄTS-FILTER
+show_active = st.sidebar.checkbox("✅ Nur Maschinen mit YTD-Aktivität", value=True)
+
+# ========================================
+# BASIS-FILTERUNG ANWENDEN
+# ========================================
+df_base = df.copy()
+
+# User-Rechte filtern
+if user_niederlassungen != ['alle']:
+    df_base = df_base[df_base['Niederlassung'].isin(user_niederlassungen)]
+
+# Aktivitäts-Filter
+if show_active:
+    df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsätze YTD'] != 0)]
+
+# Niederlassungs-Filter
+if master_nl_filter != 'Gesamt':
+    df_base = df_base[df_base['Niederlassung'] == master_nl_filter]
+
+# Produkt-Filter
+if has_product_cols:
+    if selected_family != 'Alle':
+        df_base = df_base[df_base['1. Product Family'] == selected_family]
+    if selected_group != 'Alle':
+        df_base = df_base[df_base['2. Product Group'] == selected_group]
+
+# SIDEBAR METRIKEN
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📊 Gefilterte Daten")
+st.sidebar.metric("Gefilterte Maschinen", f"{len(df_base):,}")
+st.sidebar.metric("Ausgewählte NL", master_nl_filter)
+if has_product_cols and selected_family != 'Alle':
+    st.sidebar.metric("Produkt-Filter", f"{selected_family}")
+
+# User-Info in Sidebar
+show_user_info()
+
+# EXPORT ALLE MASCHINEN
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📥 Daten Export")
+
+export_columns = ['VH-nr.', 'Code', 'Omschrijving', 'Niederlassung', 
+                  'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']
+
+export_cols_available = [col for col in export_columns if col in df_base.columns]
+df_export_all = df_base[export_cols_available].copy()
+
+st.sidebar.download_button(
+    label=f"📥 Alle Maschinen ({len(df_base):,})",
+    data=to_excel(df_export_all),
+    file_name=f'alle_maschinen_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d_%H%M")}.xlsx',
+    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    use_container_width=True,
+    help="Exportiert alle aktuell gefilterten Maschinen"
+)
+
+# ========================================
+# ÜBERSICHT SEKTION
+# ========================================
+st.header("📊 Übersicht")
+
+df_overview = df_base.copy()
+
+ytd_kosten = df_overview['Kosten YTD'].sum()
+ytd_umsaetze = df_overview['Umsätze YTD'].sum()
+ytd_db = df_overview['DB YTD'].sum()
+ytd_marge = (ytd_db / ytd_umsaetze * 100) if ytd_umsaetze != 0 else 0
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("💰 YTD Kosten", f"€ {ytd_kosten:,.0f}")
+with col2:
+    st.metric("💵 YTD Umsätze", f"€ {ytd_umsaetze:,.0f}")
+with col3:
+    st.metric("💎 YTD Deckungsbeitrag", f"€ {ytd_db:,.0f}", delta=f"{ytd_marge:.1f}%")
+with col4:
+    st.metric("📊 YTD Marge", f"{ytd_marge:.1f}%")
+
+st.markdown("---")
+
+# ========================================
+# MONATLICHE ENTWICKLUNG (4 CHARTS)
+# ========================================
+st.header("📈 Monatliche Entwicklung")
+
+df_monthly_base = df_base.copy()
+
+monthly_data = []
+for month in months:
+    monthly_data.append({
+        'Monat': month,
+        'Kosten': df_monthly_base[f'Kosten {month} 25'].sum(),
+        'Umsaetze': df_monthly_base[f'Umsätze {month} 25'].sum(),
+        'DB': df_monthly_base[f'DB {month} 25'].sum()
+    })
+
+df_monthly = pd.DataFrame(monthly_data)
+df_monthly['Marge %'] = (df_monthly['DB'] / df_monthly['Umsaetze'] * 100).fillna(0)
+
+# 4 Subplots
+fig = make_subplots(
+    rows=2, cols=2,
+    subplot_titles=('Umsätze & Kosten pro Monat', 'Deckungsbeitrag pro Monat (€)', 
+                    'Deckungsbeitrag pro Monat (%)', 'Kumulative Entwicklung'),
+    specs=[[{"secondary_y": False}, {"secondary_y": False}],
+           [{"secondary_y": False}, {"secondary_y": False}]]
+)
+
+# Chart 1: Umsätze & Kosten
+fig.add_trace(go.Bar(name='Umsätze', x=df_monthly['Monat'], y=df_monthly['Umsaetze'], 
+                     marker_color='#22c55e', text=df_monthly['Umsaetze'].apply(lambda x: f'€{x/1000:.0f}k'),
+                     textposition='outside'), row=1, col=1)
+fig.add_trace(go.Bar(name='Kosten', x=df_monthly['Monat'], y=df_monthly['Kosten'], 
+                     marker_color='#ef4444', text=df_monthly['Kosten'].apply(lambda x: f'€{x/1000:.0f}k'),
+                     textposition='outside'), row=1, col=1)
+
+# Chart 2: DB (€) mit Farben
+colors_db = ['#22c55e' if x >= 0 else '#ef4444' for x in df_monthly['DB']]
+fig.add_trace(go.Bar(name='DB (€)', x=df_monthly['Monat'], y=df_monthly['DB'], 
+                     marker_color=colors_db, showlegend=False,
+                     text=df_monthly['DB'].apply(lambda x: f'€{x/1000:.0f}k'),
+                     textposition='outside'), row=1, col=2)
+
+min_db = df_monthly['DB'].min()
+max_db = df_monthly['DB'].max()
+y_range_db = [min_db * 1.2 if min_db < 0 else 0, max_db * 1.15]
+fig.update_yaxes(range=y_range_db, row=1, col=2)
+
+# Chart 3: Marge % mit Farben
+colors_marge = ['#22c55e' if x >= 10 else '#f59e0b' if x >= 5 else '#ef4444' for x in df_monthly['Marge %']]
+fig.add_trace(go.Bar(name='Marge %', x=df_monthly['Monat'], y=df_monthly['Marge %'], 
+                     marker_color=colors_marge, showlegend=False,
+                     text=df_monthly['Marge %'].apply(lambda x: f'{x:.1f}%'),
+                     textposition='outside'), row=2, col=1)
+
+min_marge = df_monthly['Marge %'].min()
+max_marge = df_monthly['Marge %'].max()
+y_range_marge = [min_marge * 1.2 if min_marge < 0 else 0, max_marge * 1.15]
+fig.update_yaxes(range=y_range_marge, row=2, col=1)
+
+# Chart 4: Kumulative Entwicklung
+df_monthly['Kum_Umsaetze'] = df_monthly['Umsaetze'].cumsum()
+df_monthly['Kum_DB'] = df_monthly['DB'].cumsum()
+fig.add_trace(go.Scatter(name='Kum. Umsätze', x=df_monthly['Monat'], y=df_monthly['Kum_Umsaetze'],
+                         mode='lines+markers', line=dict(color='#22c55e', width=3)), row=2, col=2)
+fig.add_trace(go.Scatter(name='Kum. DB', x=df_monthly['Monat'], y=df_monthly['Kum_DB'],
+                         mode='lines+markers', line=dict(color='#3b82f6', width=3)), row=2, col=2)
+
+fig.update_layout(height=800, showlegend=True, barmode='group')
+fig.update_xaxes(title_text="Monat", row=2, col=1)
+fig.update_xaxes(title_text="Monat", row=2, col=2)
+fig.update_yaxes(title_text="Euro (€)", row=1, col=1)
+fig.update_yaxes(title_text="Euro (€)", row=1, col=2)
+fig.update_yaxes(title_text="Marge (%)", row=2, col=1)
+fig.update_yaxes(title_text="Euro (€)", row=2, col=2)
+
+st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("---")
 
 # ========================================
 # TOP 10 PERFORMER
@@ -223,7 +411,6 @@ with col2:
     st.plotly_chart(fig_top, use_container_width=True)
 
 st.markdown("---")
-
 # ========================================
 # WORST 10 PERFORMER
 # ========================================
@@ -360,6 +547,68 @@ if has_product_cols:
             file_name=f'produktanalyse_{master_nl_filter}_{pd.Timestamp.now().strftime("%Y%m%d")}.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+        
+        # TOP 20 PRODUCT GROUPS
+        if '2. Product Group' in df_products.columns:
+            st.markdown("---")
+            st.markdown("#### 🏅 Top 20 Product Groups")
+            
+            st.markdown("### 🔽 Sortieren nach:")
+            sort_groups = st.selectbox(
+                "Wähle Sortierung für Product Groups:",
+                ["Umsätze YTD (Höchster)", "DB YTD (Höchster Gewinn)", "Marge % (Beste)", "Anzahl (Meiste Maschinen)"],
+                key='sort_product_groups'
+            )
+            
+            product_group_stats = df_products.groupby('2. Product Group').agg({
+                'VH-nr.': 'count',
+                'Umsätze YTD': 'sum',
+                'DB YTD': 'sum'
+            }).reset_index()
+            
+            product_group_stats.columns = ['Product Group', 'Anzahl', 'Umsätze YTD', 'DB YTD']
+            product_group_stats['Marge %'] = (product_group_stats['DB YTD'] / product_group_stats['Umsätze YTD'] * 100).fillna(0)
+            
+            if "Umsätze YTD" in sort_groups:
+                product_group_stats = product_group_stats.sort_values('Umsätze YTD', ascending=False).head(20)
+            elif "DB YTD" in sort_groups:
+                product_group_stats = product_group_stats.sort_values('DB YTD', ascending=False).head(20)
+            elif "Marge %" in sort_groups:
+                product_group_stats = product_group_stats.sort_values('Marge %', ascending=False).head(20)
+            else:
+                product_group_stats = product_group_stats.sort_values('Anzahl', ascending=False).head(20)
+            
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                display_groups = product_group_stats.copy()
+                display_groups['Anzahl'] = display_groups['Anzahl'].apply(lambda x: f"{x:,}")
+                display_groups['Umsätze YTD'] = display_groups['Umsätze YTD'].apply(lambda x: f"€ {x:,.0f}")
+                display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
+                display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
+                
+                st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
+            
+            with col2:
+                fig_groups = go.Figure()
+                
+                fig_groups.add_trace(go.Bar(
+                    y=product_group_stats['Product Group'],
+                    x=product_group_stats['Umsätze YTD'],
+                    orientation='h',
+                    marker_color='#3b82f6',
+                    text=product_group_stats['Umsätze YTD'].apply(lambda x: f'€{x/1000:.0f}k'),
+                    textposition='outside'
+                ))
+                
+                fig_groups.update_layout(
+                    height=400,
+                    xaxis_title='Umsatz (€)',
+                    yaxis=dict(autorange='reversed'),
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig_groups, use_container_width=True)
     else:
         st.info("Keine Daten für Produktanalyse verfügbar.")
 
@@ -447,4 +696,4 @@ else:
 # FOOTER
 # ========================================
 st.markdown("---")
-st.caption("🚜 AGRO F66 Dashboard v4.0 | Simple Auth | 📊 ")
+st.caption("🚜 AGRO F66 Dashboard v4.0 |  | 📊 ")
