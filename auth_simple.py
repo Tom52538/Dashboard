@@ -1,3 +1,69 @@
+# -*- coding: utf-8 -*-
+"""
+Simple Authentication System für Streamlit
+"""
+
+import streamlit as st
+from typing import Dict, Optional
+
+class SimpleAuth:
+    """Einfaches Authentication System mit Session State"""
+    
+    def __init__(self):
+        # Session State initialisieren
+        if 'authenticated' not in st.session_state:
+            st.session_state.authenticated = False
+        if 'current_user' not in st.session_state:
+            st.session_state.current_user = None
+    
+    @staticmethod
+    def get_users() -> Dict:
+        """Gibt die Benutzer-Datenbank zurück"""
+        return {
+            'tgerkens': {
+                'password': 'admin123',
+                'name': 'Tom Gerkens',
+                'role': 'superadmin',
+                'niederlassungen': ['alle']
+            },
+            'admin': {
+                'password': 'admin123',
+                'name': 'Admin User',
+                'role': 'admin',
+                'niederlassungen': ['Coevorden', 'Vriezenveen', 'Emmen']
+            },
+            'user': {
+                'password': 'user123',
+                'name': 'Standard User',
+                'role': 'user',
+                'niederlassungen': ['Coevorden']
+            }
+        }
+    
+    def login(self, username: str, password: str) -> bool:
+        """Versucht Login mit Benutzername und Passwort"""
+        users = self.get_users()
+        
+        if username in users and users[username]['password'] == password:
+            st.session_state.authenticated = True
+            st.session_state.current_user = users[username]
+            return True
+        return False
+    
+    def logout(self):
+        """Loggt den Benutzer aus"""
+        st.session_state.authenticated = False
+        st.session_state.current_user = None
+    
+    def is_authenticated(self) -> bool:
+        """Prüft ob Benutzer eingeloggt ist"""
+        return st.session_state.authenticated
+    
+    def get_current_user(self) -> Optional[Dict]:
+        """Gibt den aktuellen Benutzer zurück"""
+        return st.session_state.current_user
+
+
 def show_login_page():
     """Zeigt die Login-Seite mit zentrierter Box"""
     
@@ -31,3 +97,19 @@ def show_login_page():
         - **Admin**: Zugriff auf mehrere Niederlassungen
         - **User**: Zugriff auf eine Niederlassung
         """)
+
+
+def show_user_info():
+    """Zeigt Benutzer-Info in der Sidebar"""
+    auth = SimpleAuth()
+    if auth.is_authenticated():
+        user = auth.get_current_user()
+        
+        st.sidebar.markdown("### 👤 Benutzer-Info")
+        st.sidebar.markdown(f"**Name:** {user['name']}")
+        st.sidebar.markdown(f"**Rolle:** {user['role']}")
+        
+        if user['niederlassungen'] == ['alle']:
+            st.sidebar.markdown("**Zugriff:** Alle Niederlassungen")
+        else:
+            st.sidebar.markdown(f"**Zugriff:** {', '.join(user['niederlassungen'])}")
