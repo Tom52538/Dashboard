@@ -4,6 +4,7 @@ Simple Authentication System für Streamlit
 """
 
 import streamlit as st
+import hashlib
 from typing import Dict, Optional
 
 class SimpleAuth:
@@ -17,32 +18,103 @@ class SimpleAuth:
             st.session_state.current_user = None
     
     @staticmethod
+    def hash_password(password: str) -> str:
+        """Erstellt SHA256 Hash von Passwort"""
+        return hashlib.sha256(password.encode()).hexdigest()
+    
+    @staticmethod
     def get_users() -> Dict:
         """Gibt die Benutzer-Datenbank zurück"""
         return {
             'tgerkens': {
-                'password': 'admin123',
-                'name': 'Tom Gerkens',
+                'password_hash': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',  # admin
+                'name': 'Thomas Gerkens',
                 'role': 'superadmin',
                 'niederlassungen': ['alle']
             },
             'lhendricks': {
-                'password': 'admin123',
-                'name': 'Leon Hendricks',
-                'role': 'superadmin',
-                'niederlassungen': ['alle']
-            },
-            'admin': {
-                'password': 'admin123',
-                'name': 'Admin User',
+                'password_hash': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',  # admin
+                'name': 'L. Hendricks',
                 'role': 'admin',
-                'niederlassungen': ['Coevorden', 'Vriezenveen', 'Emmen']
+                'niederlassungen': ['Ostwestfalen', 'Leipzig', 'Peine']
             },
-            'user': {
-                'password': 'user123',
-                'name': 'Standard User',
+            'mdrescher': {
+                'password_hash': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',  # admin
+                'name': 'M. Drescher',
+                'role': 'admin',
+                'niederlassungen': ['Hamburg', 'Bremen', 'Berlin', 'Leer']
+            },
+            'usehlinger': {
+                'password_hash': '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',  # admin
+                'name': 'U. Sehlinger',
+                'role': 'admin',
+                'niederlassungen': ['Philippsburg', 'Augsburg', 'Frankfurt', 'Saarland']
+            },
+            'jmueller': {
+                'password_hash': '365d6ac067e363086b982763345b079d8a6c235640882d95bfeeaecf3c52f8d6',
+                'name': 'J. Müller',
                 'role': 'user',
-                'niederlassungen': ['Coevorden']
+                'niederlassungen': ['Ostwestfalen']
+            },
+            'jblaut': {
+                'password_hash': 'fb90221b40de2ee33e577f2e8cedf6daadb928c8879e1df8df0739d39a307689',
+                'name': 'J. Blaut',
+                'role': 'user',
+                'niederlassungen': ['Leipzig']
+            },
+            'mjuenemann': {
+                'password_hash': '383f54815d9f0a379862b56159a5c178c7bbcce2b012448010d30579f2747be1',
+                'name': 'M. Jünemann',
+                'role': 'user',
+                'niederlassungen': ['Peine']
+            },
+            'sortgiese': {
+                'password_hash': '7286e930b6a9ab3cd7194b12abbd85fe89fe316c41e44ce0aa38a0da7bbe3a8f',
+                'name': 'S. Ortgiese',
+                'role': 'user',
+                'niederlassungen': ['Hamburg']
+            },
+            'kluedemann': {
+                'password_hash': '9c1602308c2008d5d43c9f3924cccf539b8bcb5177a03565b4ad94b48788b5f9',
+                'name': 'K. Lüdemann',
+                'role': 'user',
+                'niederlassungen': ['Bremen']
+            },
+            'berlin': {
+                'password_hash': '23821ac93172231f77b3c24f3867477f43de0b8368030f43e3edee03eb99b5e3',
+                'name': 'Berlin User',
+                'role': 'user',
+                'niederlassungen': ['Berlin']
+            },
+            'hvoss': {
+                'password_hash': 'd1578b827105ac997993ca9c5a7039898007ea7b0e8cb9c48dba4ea39dcebad8',
+                'name': 'H. Voss',
+                'role': 'user',
+                'niederlassungen': ['Leer']
+            },
+            'merk': {
+                'password_hash': '292d985fc79079b41c31c6a519fb617f8689546282121340e144e624cbf4da9a',
+                'name': 'M. Erk',
+                'role': 'user',
+                'niederlassungen': ['Philippsburg']
+            },
+            'asteiner': {
+                'password_hash': '567d0273846b142a9b148a9b5396add9f571266ec01b1765f6d0720cbb1ee4f5',
+                'name': 'A. Steiner',
+                'role': 'user',
+                'niederlassungen': ['Augsburg']
+            },
+            'kpommerening': {
+                'password_hash': '326d71452790d0a33be07264337d0204fc0f233495834e85c3cbbed30ba05b88',
+                'name': 'K. Pommerening',
+                'role': 'user',
+                'niederlassungen': ['Frankfurt']
+            },
+            'hbrandel': {
+                'password_hash': 'f400f6af8e88692bd6f6c9d4660b138f719815254152805928f3a7a45081b788',
+                'name': 'H. Brandel',
+                'role': 'user',
+                'niederlassungen': ['Saarland']
             }
         }
     
@@ -50,10 +122,14 @@ class SimpleAuth:
         """Versucht Login mit Benutzername und Passwort"""
         users = self.get_users()
         
-        if username in users and users[username]['password'] == password:
-            st.session_state.authenticated = True
-            st.session_state.current_user = users[username]
-            return True
+        if username in users:
+            password_hash = self.hash_password(password)
+            if users[username]['password_hash'] == password_hash:
+                st.session_state.authenticated = True
+                user_data = users[username].copy()
+                user_data.pop('password_hash')  # Hash nicht im Session State speichern
+                st.session_state.current_user = user_data
+                return True
         return False
     
     def logout(self):
