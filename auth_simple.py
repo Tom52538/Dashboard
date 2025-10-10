@@ -26,9 +26,9 @@ class SimpleAuth:
                 for username in st.secrets['users']:
                     user_secrets = st.secrets['users'][username]
                     users_dict[username] = {
-                        'password_hash': user_secrets.get('password_hash'),
-                        'name': user_secrets.get('name'),
-                        'role': user_secrets.get('role'),
+                        'password_hash': str(user_secrets.get('password_hash')).strip().strip('"'),
+                        'name': str(user_secrets.get('name')).strip(),
+                        'role': str(user_secrets.get('role')).strip(),
                         'niederlassungen': list(user_secrets.get('niederlassungen', []))
                     }
                 
