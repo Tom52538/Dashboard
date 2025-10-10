@@ -25,48 +25,54 @@ st.set_page_config(
 # CSS für Horizontal Scrolling
 st.markdown("""
     <style>
-    /* Horizontales Scrolling für Dataframes */
+    /* Scrolling für Dataframes */
     div[data-testid="stDataFrame"] {
         overflow-x: auto !important;
         overflow-y: hidden !important;
     }
     
     div[data-testid="stDataFrame"] > div {
-        overflow-x: auto !important;
+        overflow-x: hidden !important;
         overflow-y: auto !important;
         max-height: 400px;
     }
     
-    /* Scrollbar Styling - Horizontal */
+    /* Horizontaler Scrollbar (äußerer Container) - GUT SICHTBAR */
     div[data-testid="stDataFrame"]::-webkit-scrollbar {
-        height: 12px;
-        background: #f0f2f6;
+        height: 14px;
+        background: #e5e7eb;
+    }
+    
+    div[data-testid="stDataFrame"]::-webkit-scrollbar-track {
+        background: #f3f4f6;
+        border-radius: 8px;
+        margin: 0 10px;
     }
     
     div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb {
         background: #3b82f6;
-        border-radius: 6px;
-        border: 2px solid #f0f2f6;
+        border-radius: 8px;
+        border: 3px solid #f3f4f6;
     }
     
     div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb:hover {
         background: #2563eb;
+        border: 2px solid #f3f4f6;
     }
     
-    /* Scrollbar Styling - Vertikal */
+    /* Vertikaler Scrollbar (innerer Container) - unauffällig */
     div[data-testid="stDataFrame"] > div::-webkit-scrollbar {
-        width: 12px;
-        background: #f0f2f6;
+        width: 8px;
+        background: transparent;
     }
     
     div[data-testid="stDataFrame"] > div::-webkit-scrollbar-thumb {
-        background: #3b82f6;
-        border-radius: 6px;
-        border: 2px solid #f0f2f6;
+        background: #d1d5db;
+        border-radius: 4px;
     }
     
     div[data-testid="stDataFrame"] > div::-webkit-scrollbar-thumb:hover {
-        background: #2563eb;
+        background: #9ca3af;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -460,7 +466,6 @@ with col2:
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
     )
     st.plotly_chart(fig_top, use_container_width=True)
-    
 
 st.markdown("---")
 # ========================================
