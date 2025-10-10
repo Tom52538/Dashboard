@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 AGRO F66 Dashboard v4.0 - KOMPLETT
-Mit Simple Auth + ALLE Features
+Mit Simple Auth + ALLE Features + Horizontal Scrolling
 """
 
 import streamlit as st
@@ -21,6 +21,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# CSS für Horizontal Scrolling
+st.markdown("""
+    <style>
+    [data-testid="stDataFrame"] {
+        overflow-x: auto !important;
+    }
+    div[data-testid="stDataFrame"] > div {
+        overflow-x: auto;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # ========================================
 # HELPER FUNCTIONS
@@ -128,7 +140,11 @@ months = [col.replace('Kosten ', '').replace(' 25', '') for col in cost_cols]
 # ========================================
 st.sidebar.header("⚙️ Filter")
 
+# User-Info in Sidebar (GANZ OBEN!)
+show_user_info()
+
 # MASTER-FILTER - NIEDERLASSUNG
+st.sidebar.markdown("---")
 st.sidebar.markdown("### 🎯 Master-Filter")
 st.sidebar.info("Dieser Filter gilt für ALLE Auswertungen")
 
@@ -196,9 +212,6 @@ if has_product_cols:
         df_base = df_base[df_base['1. Product Family'] == selected_family]
     if selected_group != 'Alle':
         df_base = df_base[df_base['2. Product Group'] == selected_group]
-        
-# User-Info in Sidebar
-show_user_info()
 
 # SIDEBAR METRIKEN
 st.sidebar.markdown("---")
@@ -369,7 +382,8 @@ with col1:
     top_display['Umsätze YTD'] = top_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     top_display['Marge YTD %'] = top_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
-    st.dataframe(top_display, use_container_width=True, hide_index=True, height=400)
+    
+    st.dataframe(top_display, hide_index=True, height=400)
     
     st.download_button(
         label="📥 Export Top 10 (Excel)",
@@ -449,7 +463,8 @@ with col1:
     worst_display['Umsätze YTD'] = worst_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['DB YTD'] = worst_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
     worst_display['Marge YTD %'] = worst_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
-    st.dataframe(worst_display, use_container_width=True, hide_index=True, height=400)
+    
+    st.dataframe(worst_display, hide_index=True, height=400)
     
     st.download_button(
         label="📥 Export Worst 10 (Excel)",
@@ -539,7 +554,7 @@ if has_product_cols:
         display_products['DB YTD'] = display_products['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
         display_products['Marge %'] = display_products['Marge %'].apply(lambda x: f"{x:.1f}%")
         
-        st.dataframe(display_products, use_container_width=True, hide_index=True)
+        st.dataframe(display_products, hide_index=True)
         
         st.download_button(
             label="📥 Export Produktanalyse (Excel)",
@@ -587,7 +602,7 @@ if has_product_cols:
                 display_groups['DB YTD'] = display_groups['DB YTD'].apply(lambda x: f"€ {x:,.0f}")
                 display_groups['Marge %'] = display_groups['Marge %'].apply(lambda x: f"{x:.1f}%")
                 
-                st.dataframe(display_groups, use_container_width=True, hide_index=True, height=400)
+                st.dataframe(display_groups, hide_index=True, height=400)
             
             with col2:
                 fig_groups = go.Figure()
@@ -657,7 +672,8 @@ if len(df_no_revenue_pareto) > 0:
         display_no_rev = df_no_revenue_display.copy()
         display_no_rev['VH-nr.'] = display_no_rev['VH-nr.'].astype(str)
         display_no_rev['Kosten YTD'] = display_no_rev['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
-        st.dataframe(display_no_rev, use_container_width=True, hide_index=True, height=400)
+        
+        st.dataframe(display_no_rev, hide_index=True, height=400)
         
         st.download_button(
             label="📥 Export Maschinen ohne Umsätze (Excel)",
@@ -696,5 +712,4 @@ else:
 # FOOTER
 # ========================================
 st.markdown("---")
-st.caption("🚜 AGRO F66 Dashboard v4.0 |  | 📊 ")
-
+st.caption("🚜 AGRO F66 Dashboard v4.0 | | 📊 ")
