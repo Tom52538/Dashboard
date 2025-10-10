@@ -1,122 +1,46 @@
 """
 Einfaches Login-System für AGRO F66 Dashboard
 Ohne Google OAuth - nur Username/Passwort
+SICHERE VERSION - Passwörter nur in Streamlit Secrets!
 """
 
 import streamlit as st
 import hashlib
-import json
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 class SimpleAuth:
     """Einfaches Authentifizierungs-System"""
     
     def __init__(self):
-        # User-Datenbank laden
+        # User-Datenbank aus Secrets laden
         self.users = self._load_users()
     
     def _load_users(self) -> Dict:
-        """Lade User-Daten aus Secrets oder JSON"""
+        """Lade User-Daten aus Streamlit Secrets"""
         try:
-            # Versuche aus Streamlit Secrets zu laden
+            # Aus Streamlit Secrets laden
             if hasattr(st, 'secrets') and 'users' in st.secrets:
-                return dict(st.secrets['users'])
-        except:
-            pass
+                users_dict = {}
+                
+                # Secrets haben Format: [users.username]
+                for username in st.secrets['users']:
+                    user_secrets = st.secrets['users'][username]
+                    users_dict[username] = {
+                        'password_hash': user_secrets.get('password_hash'),
+                        'name': user_secrets.get('name'),
+                        'role': user_secrets.get('role'),
+                        'niederlassungen': list(user_secrets.get('niederlassungen', []))
+                    }
+                
+                return users_dict
+        except Exception as e:
+            st.error(f"❌ Fehler beim Laden der Secrets: {e}")
+            st.stop()
         
-        # Fallback: Default Users (für lokale Entwicklung)
-        return {
-            "tgerkens@colle.eu": {
-                "password_hash": self._hash_password("admin"),
-                "name": "Thomas Gerkens",
-                "role": "superadmin",
-                "niederlassungen": ["alle"]
-            },
-            "lhendricks@colle.eu": {
-                "password_hash": self._hash_password("admin"),
-                "name": "L. Hendricks",
-                "role": "admin",
-                "niederlassungen": ["Ostwestfalen", "Leipzig", "Peine"]
-            },
-            "jmueller@colle.eu": {
-                "password_hash": self._hash_password("owl123"),
-                "name": "J. Müller",
-                "role": "user",
-                "niederlassungen": ["Ostwestfalen"]
-            },
-            "jblaut@colle.eu": {
-                "password_hash": self._hash_password("lej123"),
-                "name": "J. Blaut",
-                "role": "user",
-                "niederlassungen": ["Leipzig"]
-            },
-            "mjuenemann@colle.eu": {
-                "password_hash": self._hash_password("pei123"),
-                "name": "M. Jünemann",
-                "role": "user",
-                "niederlassungen": ["Peine"]
-            },
-            "sortgiese@colle.eu": {
-                "password_hash": self._hash_password("ham123"),
-                "name": "S. Ortgiese",
-                "role": "user",
-                "niederlassungen": ["Hamburg"]
-            },
-            "kluedemann@colle.eu": {
-                "password_hash": self._hash_password("bre123"),
-                "name": "K. Lüdemann",
-                "role": "user",
-                "niederlassungen": ["Bremen"]
-            },
-            "berlin@colle.eu": {
-                "password_hash": self._hash_password("ber123"),
-                "name": "Berlin User",
-                "role": "user",
-                "niederlassungen": ["Berlin"]
-            },
-            "hvoss@colle.eu": {
-                "password_hash": self._hash_password("lee123"),
-                "name": "H. Voss",
-                "role": "user",
-                "niederlassungen": ["Leer"]
-            },
-            "merk@colle.eu": {
-                "password_hash": self._hash_password("phi123"),
-                "name": "M. Erk",
-                "role": "user",
-                "niederlassungen": ["Philippsburg"]
-            },
-            "asteiner@colle.eu": {
-                "password_hash": self._hash_password("aug123"),
-                "name": "A. Steiner",
-                "role": "user",
-                "niederlassungen": ["Augsburg"]
-            },
-            "kpommerening@colle.eu": {
-                "password_hash": self._hash_password("fra123"),
-                "name": "K. Pommerening",
-                "role": "user",
-                "niederlassungen": ["Frankfurt"]
-            },
-            "hbrandel@colle.eu": {
-                "password_hash": self._hash_password("saa123"),
-                "name": "H. Brandel",
-                "role": "user",
-                "niederlassungen": ["Saarland"]
-            },
-            "mdrescher@colle.eu": {
-                "password_hash": self._hash_password("admin"),
-                "name": "M. Drescher",
-                "role": "admin",
-                "niederlassungen": ["Hamburg", "Bremen", "Berlin", "Leer"]
-            },
-            "usehlinger@colle.eu": {
-                "password_hash": self._hash_password("admin"),
-                "name": "U. Sehlinger",
-                "role": "admin",
-                "niederlassungen": ["Philippsburg", "Augsburg", "Frankfurt", "Saarland"]
-            }
-        }
+        # Wenn keine Secrets gefunden
+        st.error("❌ Keine User-Daten in Secrets gefunden!")
+        st.info("Bitte konfiguriere die Secrets in Streamlit Cloud.")
+        st.stop()
     
     def _hash_password(self, password: str) -> str:
         """Hash ein Passwort mit SHA-256"""
@@ -152,15 +76,6 @@ class SimpleAuth:
         if 'authenticated' in st.session_state:
             del st.session_state['authenticated']
     
-    def get_user_niederlassungen(self, username: str) -> List[str]:
-        """Hole die Niederlassungen für einen User"""
-        if username in self.users:
-            nl = self.users[username]['niederlassungen']
-            if 'alle' in nl:
-                return ['alle']  # SuperAdmin sieht alles
-            return nl
-        return []
-    
     def is_authenticated(self) -> bool:
         """Prüfe ob User eingeloggt ist"""
         return st.session_state.get('authenticated', False)
@@ -168,18 +83,10 @@ class SimpleAuth:
     def get_current_user(self) -> Optional[Dict]:
         """Hole aktuellen User"""
         return st.session_state.get('user', None)
-    
-    def require_auth(self):
-        """Decorator-Funktion: Erfordert Login"""
-        if not self.is_authenticated():
-            st.warning("Bitte zuerst einloggen!")
-            st.stop()
 
 
 def show_login_page():
     """Zeige Login-Seite"""
-    # KEIN st.set_page_config() hier - wird in agro_dashboard_v4.py gemacht!
-    
     # Styling
     st.markdown("""
         <style>
@@ -203,7 +110,7 @@ def show_login_page():
     
     # Login-Form
     with st.form("login_form"):
-        username = st.text_input("Benutzername", placeholder="email@colle.eu")
+        username = st.text_input("Benutzername", placeholder="tgerkens")
         password = st.text_input("Passwort", type="password")
         submit = st.form_submit_button("Anmelden", use_container_width=True)
     
@@ -243,7 +150,7 @@ def show_user_info():
         with st.sidebar:
             st.markdown("---")
             st.markdown(f"**👤 {user['name']}**")
-            st.caption(f"📧 {user['username']}")
+            st.caption(f"🔧 {user['username']}")
             
             # Rolle anzeigen
             role_emoji = {
