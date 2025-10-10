@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-AGRO F66 Dashboard v4.0 - FINALE VERSION
-Mit auth_simple.py Integration
+AGRO F66 Dashboard v4.0 - KORRIGIERTE VERSION
+Mit auth_simple.py Integration + ECHTE Spaltennamen aus Excel
 """
 
 import streamlit as st
@@ -75,7 +75,7 @@ user_niederlassungen = current_user['niederlassungen']
 # Filter-Optionen basierend auf Rolle
 if user_niederlassungen == ['alle']:
     # SuperAdmin sieht alle
-    niederlassungen_list = ['Gesamt'] + sorted(df['Master NL'].unique().tolist())
+    niederlassungen_list = ['Gesamt'] + sorted(df['Niederlassung'].unique().tolist())
 else:
     # Andere: nur zugewiesene NL
     niederlassungen_list = ['Gesamt'] + user_niederlassungen
@@ -92,12 +92,12 @@ if master_nl_filter == "Gesamt":
         df_base = df.copy()
     else:
         # Admin/User: nur ihre Niederlassungen
-        df_base = df[df['Master NL'].isin(user_niederlassungen)].copy()
+        df_base = df[df['Niederlassung'].isin(user_niederlassungen)].copy()
 else:
-    df_base = df[df['Master NL'] == master_nl_filter].copy()
+    df_base = df[df['Niederlassung'] == master_nl_filter].copy()
 
 # Filter: Nur Maschinen mit Aktivität
-df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsaetze YTD'] != 0)]
+df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsätze YTD'] != 0)]
 
 # User-Info in Sidebar
 show_user_info()
@@ -116,7 +116,7 @@ st.sidebar.caption("📊 Version 4.0 | Simple Auth")
 st.header("📊 Übersicht")
 
 total_kosten = df_base['Kosten YTD'].sum()
-total_umsatz = df_base['Umsaetze YTD'].sum()
+total_umsatz = df_base['Umsätze YTD'].sum()
 total_db = df_base['DB YTD'].sum()
 marge_prozent = (total_db / total_umsatz * 100) if total_umsatz != 0 else 0
 
@@ -137,14 +137,14 @@ st.markdown("---")
 # ========================================
 st.header("📅 Monatliche Entwicklung")
 
-months = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 kosten_monthly = []
 umsatz_monthly = []
 db_monthly = []
 
 for month in months:
-    kosten_col = f'Kosten {month}'
-    umsatz_col = f'Umsaetze {month}'
+    kosten_col = f'Kosten {month} 25'
+    umsatz_col = f'Umsätze {month} 25'
     
     if kosten_col in df_base.columns and umsatz_col in df_base.columns:
         kosten = df_base[kosten_col].sum()
@@ -192,9 +192,9 @@ if len(df_top) >= 10:
     with col1:
         st.subheader("📋 Tabelle")
         
-        top_display = top_10[['VH-nr.', 'Code', 'Master NL', 'Kosten YTD', 'Umsaetze YTD', 'DB YTD', 'Marge YTD %']].copy()
+        top_display = top_10[['VH-nr.', 'Code', 'Niederlassung', 'Kosten YTD', 'Umsätze YTD', 'DB YTD', 'Marge YTD %']].copy()
         top_display['Kosten YTD'] = top_display['Kosten YTD'].apply(lambda x: f"€ {x:,.2f}")
-        top_display['Umsaetze YTD'] = top_display['Umsaetze YTD'].apply(lambda x: f"€ {x:,.2f}")
+        top_display['Umsätze YTD'] = top_display['Umsätze YTD'].apply(lambda x: f"€ {x:,.2f}")
         top_display['DB YTD'] = top_display['DB YTD'].apply(lambda x: f"€ {x:,.2f}")
         top_display['Marge YTD %'] = top_display['Marge YTD %'].apply(lambda x: f"{x:.1f}%")
         
@@ -231,7 +231,7 @@ if len(df_top) >= 10:
         for idx, row in top_10.iterrows():
             y_label = str(row['VH-nr.']) + ' | ' + str(row['Code'])
             fig_top.add_annotation(
-                x=row['Umsaetze YTD'],
+                x=row['Umsätze YTD'],
                 y=y_label,
                 text=f"{row['Marge YTD %']:.1f}%",
                 showarrow=False,
@@ -258,4 +258,4 @@ st.markdown("---")
 # ========================================
 # FOOTER
 # ========================================
-st.caption("🚜 AGRO F66 Dashboard Umsätze pro Maschine |  | 📊 ")
+st.caption("🚜 Dashboard v4.0 | Simple Auth | 📊 ")
