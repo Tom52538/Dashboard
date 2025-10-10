@@ -26,6 +26,12 @@ class SimpleAuth:
                 'role': 'superadmin',
                 'niederlassungen': ['alle']
             },
+            'lhendricks': {
+                'password': 'admin123',
+                'name': 'Leon Hendricks',
+                'role': 'superadmin',
+                'niederlassungen': ['alle']
+            },
             'admin': {
                 'password': 'admin123',
                 'name': 'Admin User',
