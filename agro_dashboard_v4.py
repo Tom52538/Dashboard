@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-AGRO F66 Dashboard v4.0 - KORRIGIERTE VERSION
-Mit Simple Login System - ALLE Spaltennamen geprüft!
-TEIL 1 von 2: Imports bis Datenfilter
+AGRO F66 Dashboard v4.0 - FINALE VERSION
+Mit auth_simple.py Integration
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from io import BytesIO
+from auth_simple import SimpleAuth, show_login_page, show_user_info
 
 # ========================================
 # PAGE CONFIG
 # ========================================
 st.set_page_config(
-    page_title="AGRO F66 Dashboard",
+    page_title="AGRO F66 Dashboard Umsätze pro Maschine",
     page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,50 +23,15 @@ st.set_page_config(
 # ========================================
 # AUTHENTICATION
 # ========================================
-def check_credentials(username, password):
-    """Simple authentication - Passwörter plain text für Demo"""
-    users = {
-        "tgerkens@colle.eu": {"password": "test123", "name": "Tobias Gerkens", "role": "superadmin", "niederlassungen": "Gesamt"},
-        "thell@colle.eu": {"password": "test123", "name": "Theresa Hell", "role": "admin", "niederlassungen": "Augsburg, München, Stuttgart"},
-        "ckuehner@colle.eu": {"password": "test123", "name": "Christian Kühner", "role": "admin", "niederlassungen": "Arnstadt, Halle, Leipzig"},
-        "sschulz@colle.eu": {"password": "test123", "name": "Simon Schulz", "role": "admin", "niederlassungen": "Bremen, Hamburg, Hannover"},
-        "augsburg": {"password": "test123", "name": "User Augsburg", "role": "user", "niederlassungen": "Augsburg"},
-        "muenchen": {"password": "test123", "name": "User München", "role": "user", "niederlassungen": "München"},
-        "stuttgart": {"password": "test123", "name": "User Stuttgart", "role": "user", "niederlassungen": "Stuttgart"},
-        "arnstadt": {"password": "test123", "name": "User Arnstadt", "role": "user", "niederlassungen": "Arnstadt"},
-        "halle": {"password": "test123", "name": "User Halle", "role": "user", "niederlassungen": "Halle"},
-        "leipzig": {"password": "test123", "name": "User Leipzig", "role": "user", "niederlassungen": "Leipzig"},
-        "bremen": {"password": "test123", "name": "User Bremen", "role": "user", "niederlassungen": "Bremen"},
-        "hamburg": {"password": "test123", "name": "User Hamburg", "role": "user", "niederlassungen": "Hamburg"},
-        "hannover": {"password": "test123", "name": "User Hannover", "role": "user", "niederlassungen": "Hannover"},
-        "kassel": {"password": "test123", "name": "User Kassel", "role": "user", "niederlassungen": "Kassel"},
-        "koeln": {"password": "test123", "name": "User Köln", "role": "user", "niederlassungen": "Köln"}
-    }
-    
-    if username in users and users[username]["password"] == password:
-        return users[username]
-    return None
+auth = SimpleAuth()
 
-# Login Screen
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.title("🚜 AGRO F66 Dashboard")
-    st.subheader("Bitte anmelden")
-    
-    username = st.text_input("Benutzername")
-    password = st.text_input("Passwort", type="password")
-    
-    if st.button("Anmelden"):
-        user_data = check_credentials(username, password)
-        if user_data:
-            st.session_state.logged_in = True
-            st.session_state.user = user_data
-            st.rerun()
-        else:
-            st.error("❌ Ungültige Anmeldedaten!")
+# Login-Check
+if not auth.is_authenticated():
+    show_login_page()
     st.stop()
+
+# User-Info holen
+current_user = auth.get_current_user()
 
 # ========================================
 # DATEN LADEN
@@ -88,16 +52,16 @@ if df is None:
     st.stop()
 
 # ========================================
-# HEADER & USER INFO
+# HEADER
 # ========================================
 col1, col2, col3 = st.columns([2, 3, 1])
 with col1:
     st.title("🚜 AGRO F66 Dashboard")
 with col2:
-    st.markdown(f"### 👤 {st.session_state.user['name']}")
+    st.markdown(f"### 👤 {current_user['name']}")
 with col3:
     if st.button("🚪 Logout"):
-        st.session_state.logged_in = False
+        auth.logout()
         st.rerun()
 
 # ========================================
@@ -105,20 +69,16 @@ with col3:
 # ========================================
 st.sidebar.header("🎯 Filter")
 
-# Niederlassung Filter basierend auf User-Rolle
-user_role = st.session_state.user['role']
-user_niederlassungen = st.session_state.user['niederlassungen']
+# User-Niederlassungen holen
+user_niederlassungen = current_user['niederlassungen']
 
-if user_role == 'superadmin':
+# Filter-Optionen basierend auf Rolle
+if user_niederlassungen == ['alle']:
     # SuperAdmin sieht alle
     niederlassungen_list = ['Gesamt'] + sorted(df['Master NL'].unique().tolist())
 else:
-    # Andere User sehen nur ihre zugewiesenen Niederlassungen
-    if user_niederlassungen == 'Gesamt':
-        niederlassungen_list = ['Gesamt'] + sorted(df['Master NL'].unique().tolist())
-    else:
-        allowed = [nl.strip() for nl in user_niederlassungen.split(',')]
-        niederlassungen_list = allowed
+    # Andere: nur zugewiesene NL
+    niederlassungen_list = ['Gesamt'] + user_niederlassungen
 
 master_nl_filter = st.sidebar.selectbox(
     "Niederlassung",
@@ -128,26 +88,27 @@ master_nl_filter = st.sidebar.selectbox(
 
 # Daten filtern
 if master_nl_filter == "Gesamt":
-    df_base = df.copy()
+    if user_niederlassungen == ['alle']:
+        df_base = df.copy()
+    else:
+        # Admin/User: nur ihre Niederlassungen
+        df_base = df[df['Master NL'].isin(user_niederlassungen)].copy()
 else:
     df_base = df[df['Master NL'] == master_nl_filter].copy()
 
 # Filter: Nur Maschinen mit Aktivität
 df_base = df_base[(df_base['Kosten YTD'] != 0) | (df_base['Umsaetze YTD'] != 0)]
 
+# User-Info in Sidebar
+show_user_info()
+
 # Debug Info
 with st.sidebar.expander("🔍 Debug Info"):
     st.write(f"**Gefilterte Maschinen:** {len(df_base)}")
-    st.write(f"**Verfügbare Spalten:** {list(df_base.columns)}")
+    st.write(f"**Niederlassungen:** {user_niederlassungen}")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("📊 Version 4.0 | Simple Login")
-
-# ========================================
-# ========================================
-# FORTSETZUNG VON TEIL 1
-# Füge diesen Code DIREKT nach Teil 1 ein!
-# ========================================
+st.sidebar.caption("📊 Version 4.0 | Simple Auth")
 
 # ========================================
 # ÜBERSICHT (KPIs)
@@ -297,4 +258,4 @@ st.markdown("---")
 # ========================================
 # FOOTER
 # ========================================
-st.caption("🚜 AGRO F66 Dashboard v4.0 | Simple Login | 📊 Alle Daten in Echtzeit")
+st.caption("🚜 AGRO F66 Dashboard Umsätze pro Maschine |  | 📊 ")
