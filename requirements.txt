@@ -7,6 +7,9 @@ plotly==5.24.1
 openpyxl==3.1.5
 gdown==5.1.0
 
-# Neu für Google Sheets Logger
+# Für Google Sheets Logger
 gspread==6.1.2
 google-auth==2.35.0
+
+# Für Zeitzone
+pytz==2024.1
