@@ -1,0 +1,42 @@
+name: Wake Up Dashboard
+
+on:
+  schedule:
+    # Montag-Freitag um 07:00 Uhr MEZ (06:00 UTC im Winter, 05:00 UTC im Sommer)
+    - cron: '0 6 * * 1-5'
+    # Mittags um 12:00 Uhr MEZ
+    - cron: '0 11 * * 1-5'
+    # Nachmittags um 16:30 Uhr MEZ
+    - cron: '30 15 * * 1-5'
+  
+  # Ermöglicht manuelles Triggern über GitHub UI
+  workflow_dispatch:
+
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Streamlit Dashboard
+        run: |
+          echo "🔔 Wecke AGRO F66 Dashboard auf..."
+          
+          # ⚠️ ERSETZE 'DEINE-APP' mit deinem tatsächlichen Streamlit App Namen!
+          # Format: https://DEINE-APP.streamlit.app
+          # Beispiel: https://agro-f66-dashboard.streamlit.app
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://umsaetze-pro-maschine-dashboard.streamlit.app/)
+          
+          echo "📊 HTTP Response Code: $RESPONSE"
+          
+          if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 302 ]; then
+            echo "✅ Dashboard ist wach und antwortet!"
+          else
+            echo "⚠️ Dashboard antwortet mit ungewöhnlichem Code: $RESPONSE"
+            echo "ℹ️ Dies kann normal sein wenn die App gerade startet."
+          fi
+          
+      - name: Zeitstempel
+        run: |
+          echo "⏰ Workflow ausgeführt um: $(date +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "📍 Zeitzone: UTC (Deutschland ist UTC+1/+2)"
