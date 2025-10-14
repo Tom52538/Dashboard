@@ -57,7 +57,7 @@ class LoginLogger:
         
         try:
             log_entry = [
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                datetime.now(pytz.timezone('Europe/Berlin')).strftime('%Y-%m-%d %H:%M:%S'),
                 user_data.get('username', 'unknown'),
                 user_data.get('name', 'unknown'),
                 user_data.get('role', 'user'),
@@ -77,7 +77,7 @@ class LoginLogger:
         
         try:
             log_entry = [
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                datetime.now(pytz.timezone('Europe/Berlin')).strftime('%Y-%m-%d %H:%M:%S'),
                 user_data.get('username', 'unknown'),
                 user_data.get('name', 'unknown'),
                 user_data.get('role', 'user'),
@@ -134,3 +134,4 @@ class LoginLogger:
         }
         
         return stats
+
