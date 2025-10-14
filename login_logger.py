@@ -1,73 +1,127 @@
 # -*- coding: utf-8 -*-
 """
 Login Logger für AGRO F66 Dashboard
-Trackt User-Logins diskret für Admin-Analysen
+Speichert Login-Daten persistent in Google Sheets
 """
 
-import pandas as pd
+import streamlit as st
 from datetime import datetime
-import os
-from pathlib import Path
+import gspread
+from google.oauth2.service_account import Credentials
 
 class LoginLogger:
-    def __init__(self, log_file='logs/login_history.csv'):
-        self.log_file = log_file
-        # Stelle sicher, dass der logs-Ordner existiert
-        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Erstelle CSV wenn nicht vorhanden
-        if not os.path.exists(log_file):
-            df = pd.DataFrame(columns=['timestamp', 'username', 'name', 'role', 'niederlassung', 'action'])
-            df.to_csv(log_file, index=False)
+    def __init__(self):
+        """Initialisiert Google Sheets Verbindung"""
+        self.sheet = None
+        self.setup_sheets()
+    
+    def setup_sheets(self):
+        """Stellt Verbindung zu Google Sheets her"""
+        try:
+            # Credentials aus Streamlit Secrets
+            scopes = [
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+            
+            credentials = Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"],
+                scopes=scopes
+            )
+            
+            client = gspread.authorize(credentials)
+            
+            # Sheet öffnen
+            sheet_id = st.secrets["google_sheets"]["sheet_id"]
+            spreadsheet = client.open_by_key(sheet_id)
+            
+            # Erstes Worksheet verwenden
+            self.sheet = spreadsheet.sheet1
+            
+            # Header erstellen falls nicht vorhanden
+            try:
+                headers = self.sheet.row_values(1)
+                if not headers or headers[0] != 'timestamp':
+                    self.sheet.insert_row(['timestamp', 'username', 'name', 'role', 'niederlassung', 'action'], 1)
+            except:
+                self.sheet.insert_row(['timestamp', 'username', 'name', 'role', 'niederlassung', 'action'], 1)
+                
+        except Exception as e:
+            st.error(f"⚠️ Fehler beim Verbinden mit Google Sheets: {e}")
+            self.sheet = None
     
     def log_login(self, user_data):
         """Loggt einen Login"""
-        log_entry = {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'username': user_data.get('username', 'unknown'),
-            'name': user_data.get('name', 'unknown'),
-            'role': user_data.get('role', 'user'),
-            'niederlassung': ', '.join(user_data.get('niederlassungen', [])),
-            'action': 'login'
-        }
+        if not self.sheet:
+            return
         
-        # Append zu CSV
-        df = pd.DataFrame([log_entry])
-        df.to_csv(self.log_file, mode='a', header=False, index=False)
+        try:
+            log_entry = [
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                user_data.get('username', 'unknown'),
+                user_data.get('name', 'unknown'),
+                user_data.get('role', 'user'),
+                ', '.join(user_data.get('niederlassungen', [])),
+                'login'
+            ]
+            
+            self.sheet.append_row(log_entry)
+            
+        except Exception as e:
+            st.error(f"⚠️ Fehler beim Loggen: {e}")
     
     def log_logout(self, user_data):
         """Loggt einen Logout"""
-        log_entry = {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'username': user_data.get('username', 'unknown'),
-            'name': user_data.get('name', 'unknown'),
-            'role': user_data.get('role', 'user'),
-            'niederlassung': ', '.join(user_data.get('niederlassungen', [])),
-            'action': 'logout'
-        }
+        if not self.sheet:
+            return
         
-        df = pd.DataFrame([log_entry])
-        df.to_csv(self.log_file, mode='a', header=False, index=False)
+        try:
+            log_entry = [
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                user_data.get('username', 'unknown'),
+                user_data.get('name', 'unknown'),
+                user_data.get('role', 'user'),
+                ', '.join(user_data.get('niederlassungen', [])),
+                'logout'
+            ]
+            
+            self.sheet.append_row(log_entry)
+            
+        except Exception as e:
+            st.error(f"⚠️ Fehler beim Loggen: {e}")
     
     def get_logs(self, days=30):
-        """Liest die letzten X Tage"""
-        if not os.path.exists(self.log_file):
-            return pd.DataFrame()
+        """Liest die letzten X Tage aus Google Sheets"""
+        if not self.sheet:
+            return None
         
-        df = pd.read_csv(self.log_file)
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-        
-        # Filtere letzte X Tage
-        cutoff = datetime.now() - pd.Timedelta(days=days)
-        df = df[df['timestamp'] >= cutoff]
-        
-        return df.sort_values('timestamp', ascending=False)
+        try:
+            import pandas as pd
+            
+            # Alle Daten holen
+            all_data = self.sheet.get_all_records()
+            
+            if not all_data:
+                return None
+            
+            df = pd.DataFrame(all_data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            # Filtere letzte X Tage
+            cutoff = datetime.now() - pd.Timedelta(days=days)
+            df = df[df['timestamp'] >= cutoff]
+            
+            return df.sort_values('timestamp', ascending=False)
+            
+        except Exception as e:
+            st.error(f"⚠️ Fehler beim Lesen der Logs: {e}")
+            return None
     
     def get_stats(self):
         """Erstellt Statistiken"""
         df = self.get_logs(days=30)
         
-        if len(df) == 0:
+        if df is None or len(df) == 0:
             return None
         
         stats = {
