@@ -8,6 +8,8 @@ import streamlit as st
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+import pytz
+import pandas as pd
 
 class LoginLogger:
     def __init__(self):
@@ -96,8 +98,6 @@ class LoginLogger:
             return None
         
         try:
-            import pandas as pd
-            
             # Alle Daten holen
             all_data = self.sheet.get_all_records()
             
@@ -107,8 +107,13 @@ class LoginLogger:
             df = pd.DataFrame(all_data)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             
-            # Filtere letzte X Tage
-            cutoff = datetime.now() - pd.Timedelta(days=days)
+            # Filtere letzte X Tage - mit Europe/Berlin Zeitzone
+            berlin_tz = pytz.timezone('Europe/Berlin')
+            cutoff = datetime.now(berlin_tz) - pd.Timedelta(days=days)
+            
+            # Konvertiere cutoff zu naive datetime für Vergleich
+            cutoff = cutoff.replace(tzinfo=None)
+            
             df = df[df['timestamp'] >= cutoff]
             
             return df.sort_values('timestamp', ascending=False)
@@ -124,14 +129,17 @@ class LoginLogger:
         if df is None or len(df) == 0:
             return None
         
+        # Heutiges Datum in Europe/Berlin Zeitzone
+        berlin_tz = pytz.timezone('Europe/Berlin')
+        today = datetime.now(berlin_tz).date()
+        
         stats = {
             'total_logins': len(df[df['action'] == 'login']),
             'unique_users': df['username'].nunique(),
             'most_active_user': df['username'].mode()[0] if len(df) > 0 else 'N/A',
             'logins_today': len(df[(df['action'] == 'login') & 
-                                   (df['timestamp'].dt.date == datetime.now().date())]),
+                                   (df['timestamp'].dt.date == today)]),
             'last_login': df[df['action'] == 'login'].iloc[0] if len(df) > 0 else None
         }
         
         return stats
-
