@@ -754,7 +754,7 @@ else:
 # ========================================
 # ADMIN PANEL - LOGIN LOGS (nur für Admins)
 # ========================================
-if current_user['role'] in ['admin', 'superadmin']:
+if current_user.get('username') == 'tgerkens':
     st.markdown("---")
     
     with st.expander("🔐 Admin: Login Logs", expanded=False):
@@ -820,3 +820,4 @@ if current_user['role'] in ['admin', 'superadmin']:
 # ========================================
 st.markdown("---")
 st.caption("🚜 AGRO F66 Dashboard v4.0 | 📊")
+
