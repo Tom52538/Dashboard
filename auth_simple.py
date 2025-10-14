@@ -6,6 +6,10 @@ Simple Authentication System für Streamlit
 import streamlit as st
 import hashlib
 from typing import Dict, Optional
+from login_logger import LoginLogger
+
+# 📊 Logger initialisieren
+logger = LoginLogger()
 
 class SimpleAuth:
     """Einfaches Authentication System mit Session State"""
@@ -128,12 +132,24 @@ class SimpleAuth:
                 st.session_state.authenticated = True
                 user_data = users[username].copy()
                 user_data.pop('password_hash')  # Hash nicht im Session State speichern
+                
+                # 📊 USERNAME HINZUFÜGEN (wichtig für Logger!)
+                user_data['username'] = username
+                
                 st.session_state.current_user = user_data
+                
+                # 📊 LOGIN LOGGEN
+                logger.log_login(user_data)
+                
                 return True
         return False
     
     def logout(self):
         """Loggt den Benutzer aus"""
+        # 📊 LOGOUT LOGGEN (BEVOR Session gelöscht wird!)
+        if st.session_state.current_user:
+            logger.log_logout(st.session_state.current_user)
+        
         st.session_state.authenticated = False
         st.session_state.current_user = None
     
