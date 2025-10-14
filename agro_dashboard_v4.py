@@ -752,6 +752,70 @@ else:
     st.success("✅ Keine Maschinen ohne Umsätze gefunden!")
 
 # ========================================
+# ADMIN PANEL - LOGIN LOGS (nur für Admins)
+# ========================================
+if current_user['role'] in ['admin', 'superadmin']:
+    st.markdown("---")
+    
+    with st.expander("🔐 Admin: Login Logs", expanded=False):
+        from login_logger import LoginLogger
+        logger_admin = LoginLogger()
+        
+        # Statistiken
+        stats = logger_admin.get_stats()
+        
+        if stats:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("🔢 Logins (30d)", stats['total_logins'])
+            with col2:
+                st.metric("👥 Unique Users", stats['unique_users'])
+            with col3:
+                st.metric("📅 Heute", stats['logins_today'])
+            with col4:
+                st.metric("🔥 Aktivster User", stats['most_active_user'])
+            
+            st.markdown("---")
+            
+            # Filter
+            col_filter1, col_filter2 = st.columns(2)
+            with col_filter1:
+                days_filter = st.selectbox("Zeitraum", [7, 14, 30, 60, 90], index=2, key='log_days')
+            with col_filter2:
+                action_filter = st.selectbox("Aktion", ['Alle', 'login', 'logout'], key='log_action')
+            
+            # Logs anzeigen
+            df_logs = logger_admin.get_logs(days=days_filter)
+            
+            if action_filter != 'Alle':
+                df_logs = df_logs[df_logs['action'] == action_filter]
+            
+            if len(df_logs) > 0:
+                # Formatierung für Anzeige
+                df_display = df_logs.copy()
+                df_display['timestamp'] = df_display['timestamp'].dt.strftime('%d.%m.%Y %H:%M:%S')
+                
+                st.dataframe(
+                    df_display[['timestamp', 'name', 'username', 'role', 'niederlassung', 'action']], 
+                    hide_index=True, 
+                    height=400,
+                    use_container_width=True
+                )
+                
+                # Export
+                st.download_button(
+                    label="📥 Export Login Logs (Excel)",
+                    data=to_excel(df_logs),
+                    file_name=f'login_logs_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx',
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    use_container_width=True
+                )
+            else:
+                st.info("Keine Logs im gewählten Zeitraum")
+        else:
+            st.info("Noch keine Login-Daten vorhanden")
+
+# ========================================
 # FOOTER
 # ========================================
 st.markdown("---")
