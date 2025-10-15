@@ -25,7 +25,7 @@ jobs:
           # Format: https://DEINE-APP.streamlit.app
           # Beispiel: https://agro-f66-dashboard.streamlit.app
           
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://umsaetze-pro-maschine-dashboard.streamlit.app/)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://umsaetze-pro-maschine-dashboard.streamlit.app)
           
           echo "📊 HTTP Response Code: $RESPONSE"
           
