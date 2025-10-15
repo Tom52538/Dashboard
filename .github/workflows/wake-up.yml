@@ -29,7 +29,7 @@ jobs:
           
           echo "📊 HTTP Response Code: $RESPONSE"
           
-          if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 302 ]; then
+          if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 302 ] || [ $RESPONSE -eq 303 ]; then
             echo "✅ Dashboard ist wach und antwortet!"
           else
             echo "⚠️ Dashboard antwortet mit ungewöhnlichem Code: $RESPONSE"
