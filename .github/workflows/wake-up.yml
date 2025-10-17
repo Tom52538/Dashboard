@@ -2,6 +2,13 @@ name: Wake Up Dashboard
 
 on:
   schedule:
+    # 🧪 TEST-TIMER: Läuft um 06:27, 06:28, 06:29 UTC (08:27, 08:28, 08:29 deutsche Zeit)
+    # LÖSCHE DIESE ZEILEN NACH DEM TEST!
+    - cron: '27 6 17 10 *'  # 17. Oktober 06:27 UTC (08:27 deutsche Zeit)
+    - cron: '28 6 17 10 *'  # 17. Oktober 06:28 UTC (08:28 deutsche Zeit)
+    - cron: '29 6 17 10 *'  # 17. Oktober 06:29 UTC (08:29 deutsche Zeit)
+    
+    # ✅ PRODUKTIV-TIMER (BEHALTEN!)
     # Montag-Freitag um 07:00 Uhr deutsche Sommerzeit (GMT+2 = 05:00 UTC)
     - cron: '0 5 * * 1-5'
     # Mittags um 12:00 Uhr deutsche Sommerzeit (GMT+2 = 10:00 UTC)
@@ -21,10 +28,6 @@ jobs:
         run: |
           echo "🔔 Wecke AGRO F66 Dashboard auf..."
           
-          # ⚠️ ERSETZE 'DEINE-APP' mit deinem tatsächlichen Streamlit App Namen!
-          # Format: https://DEINE-APP.streamlit.app
-          # Beispiel: https://agro-f66-dashboard.streamlit.app
-          
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://umsaetze-pro-maschine-dashboard.streamlit.app)
           
           echo "📊 HTTP Response Code: $RESPONSE"
@@ -40,3 +43,4 @@ jobs:
         run: |
           echo "⏰ Workflow ausgeführt um: $(date +'%Y-%m-%d %H:%M:%S UTC')"
           echo "📍 Zeitzone: UTC (Deutschland ist UTC+1/+2)"
+          echo "🧪 TEST-MODUS: Prüfe ob App aufwacht!"
