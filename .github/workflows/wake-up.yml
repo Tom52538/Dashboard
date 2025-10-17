@@ -2,12 +2,12 @@ name: Wake Up Dashboard
 
 on:
   schedule:
-    # Montag-Freitag um 07:00 Uhr MEZ (06:00 UTC im Winter, 05:00 UTC im Sommer)
-    - cron: '0 6 * * 1-5'
-    # Mittags um 12:00 Uhr MEZ
-    - cron: '0 11 * * 1-5'
-    # Nachmittags um 16:30 Uhr MEZ
-    - cron: '30 15 * * 1-5'
+    # Montag-Freitag um 07:00 Uhr deutsche Sommerzeit (GMT+2 = 05:00 UTC)
+    - cron: '0 5 * * 1-5'
+    # Mittags um 12:00 Uhr deutsche Sommerzeit (GMT+2 = 10:00 UTC)
+    - cron: '0 10 * * 1-5'
+    # Nachmittags um 16:30 Uhr deutsche Sommerzeit (GMT+2 = 14:30 UTC)
+    - cron: '30 14 * * 1-5'
   
   # Ermöglicht manuelles Triggern über GitHub UI
   workflow_dispatch:
