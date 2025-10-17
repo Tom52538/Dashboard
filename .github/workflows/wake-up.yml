@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "🔔 Wecke AGRO F66 Dashboard auf..."
           
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://umsaetze-pro-maschine-dashboard.streamlit.app)
+          RESPONSE=$(curl -L -s -o /dev/null -w "%{http_code}" https://umsaetze-pro-maschine-dashboard.streamlit.app)
           
           echo "📊 HTTP Response Code: $RESPONSE"
           
